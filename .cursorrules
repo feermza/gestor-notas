@@ -1,0 +1,128 @@
+# Sistema de Gestión de Notas - RRHH
+
+## Descripción del proyecto
+
+Sistema web para gestión y seguimiento de notas que ingresan a una oficina de Recursos Humanos.
+Problema principal: falta de trazabilidad y seguimiento formal de notas.
+
+## Stack tecnológico
+
+- Backend: Django 4.x + Django REST Framework
+- Frontend: Vue 3 + Vite + PrimeVue (o Vuetify)
+- Base de datos: PostgreSQL 15
+- Servidor: Nginx + Gunicorn sobre Ubuntu Server 22.04
+- Entorno de desarrollo: Windows con Cursor
+- IDE: Cursor con Composer para desarrollo asistido por IA
+
+## Roles de usuario
+
+1. Administrador - gestión total del sistema
+2. Director - puede crear, revisar, asignar, reasignar, anular notas
+3. Jefe - mismos permisos que Director en operación diaria
+4. Empleado - puede crear notas, actualizar las propias asignadas
+5. Solo Lectura - solo consulta y reportes
+
+## Estados de una nota (flujo formal)
+
+INGRESADA → EN_REVISION → ASIGNADA → EN_PROCESO → RESUELTA → ARCHIVADA
+
+- EN_ESPERA: estado lateral desde EN_PROCESO (bloqueada por factor externo)
+- DEVUELTA: desde EN_PROCESO, vuelve a ASIGNADA con nuevo responsable
+- ANULADA: salida administrativa desde cualquier estado activo (solo Admin/Director)
+
+## Transiciones de estado permitidas
+
+- INGRESADA → EN_REVISION: Director, Jefe, Admin
+- EN_REVISION → ASIGNADA: Director, Jefe, Admin (requiere elegir responsable)
+- ASIGNADA → EN_PROCESO: Responsable asignado, Jefe, Director, Admin
+- EN_PROCESO → EN_ESPERA: Responsable, Jefe, Director, Admin (requiere motivo)
+- EN_ESPERA → EN_PROCESO: Responsable, Jefe, Director, Admin
+- EN_PROCESO → DEVUELTA: Responsable, Jefe, Director, Admin (requiere motivo)
+- DEVUELTA → ASIGNADA: Director, Jefe, Admin (requiere nuevo responsable)
+- EN_PROCESO → RESUELTA: Responsable, Jefe, Director, Admin
+- RESUELTA → ARCHIVADA: Responsable, Jefe, Director, Admin
+- RESUELTA → EN_PROCESO: Director, Jefe, Admin (requiere motivo)
+- Cualquier estado activo → ANULADA: Director, Admin (requiere motivo)
+
+## Modelo principal: Nota
+
+Campos: id, numero_nota, fecha_ingreso, fecha_limite, remitente, area_origen,
+tema, descripcion, prioridad, estado, canal_ingreso, responsable_id,
+creado_por_id, fecha_creacion, ultima_modificacion, anulada, motivo_anulacion
+
+## Modelo: HistorialNota (inmutable)
+
+Campos: id, nota_id, usuario_id, fecha_hora, tipo_evento, estado_anterior,
+estado_nuevo, responsable_anterior, responsable_nuevo, descripcion_cambio,
+campos_modificados (JSONField)
+
+## Modelo: Adjunto
+
+Campos: id, nota_id, nombre_archivo, ruta_almacenamiento, tipo_mime,
+tamaño_bytes, subido_por_id, fecha_subida
+
+## Modelo: Usuario
+
+Extiende AbstractUser. Campo adicional: rol (choices: ADMIN, DIRECTOR, JEFE, EMPLEADO, SOLO_LECTURA)
+
+## Reglas de negocio críticas
+
+- Nunca se borra una nota físicamente (solo borrado lógico o anulación con motivo)
+- El historial de cambios es inmutable, nunca se edita ni elimina
+- Toda nota pasa obligatoriamente por EN_REVISION antes de asignarse
+- Director y Jefe pueden autoasignarse notas
+- El responsable puede archivar directamente sin validación adicional
+- DEVUELTA requiere motivo obligatorio
+- EN_ESPERA requiere motivo obligatorio
+- ANULADA requiere motivo obligatorio
+- La numeración numero_nota se genera automáticamente: NOTA-YYYY-NNNN
+
+## Permisos por rol
+
+- Crear nota: Admin, Director, Jefe, Empleado
+- Ver todas las notas: Admin, Director, Jefe, Solo Lectura
+- Ver solo propias/asignadas: Empleado
+- Asignar/Reasignar: Admin, Director, Jefe
+- Cambiar estado: según tabla de transiciones
+- Anular nota: Admin, Director
+- Eliminar físicamente: nadie
+- Gestionar usuarios: solo Admin
+- Ver reportes: Admin, Director, Jefe, Solo Lectura
+
+## Convenciones de código
+
+- Python: PEP8, 4 espacios, snake_case
+- Vue: Composition API, <script setup>, camelCase para props
+- API REST: endpoints en español siguiendo el modelo de datos
+- Variables de entorno en archivo .env (nunca hardcodear credenciales)
+- Un modelo por archivo en Django cuando sea posible
+- Comentarios en español
+- Commits en español con prefijos: feat, fix, refactor, docs
+
+## Estructura de apps Django
+
+- "usuarios" → modelo de usuario personalizado con roles
+- "notas" → modelos Nota, HistorialNota, Adjunto
+- "reportes" → vistas para listados y reportes
+
+## Fase actual: MVP
+
+1. Registro de notas con todos los campos
+2. Flujo completo de estados con transiciones controladas
+3. Asignación y reasignación de responsables
+4. Historial inmutable de movimientos
+5. Carga de adjuntos
+6. Listado de notas pendientes por persona
+7. Listado de notas atrasadas
+8. Login con roles y control de sesiones
+9. Panel administrativo básico
+
+## Fuera del MVP (no sugerir ni implementar todavía)
+
+- Notificaciones automáticas por email o WhatsApp
+- Dashboard con métricas avanzadas
+- Integración con otros sistemas
+- Docker
+- App móvil o PWA
+- MinIO para almacenamiento de adjuntos
+- Firma digital
