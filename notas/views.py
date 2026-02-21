@@ -1,11 +1,19 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny  # Temporal hasta Prompt 5
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
-from django.conf import settings
+
+from usuarios.permissions import (
+    EstaAutenticado,
+    EsDirectorJefeOAdmin,
+    PuedeCrearNota,
+    PuedeVerTodasLasNotas,
+    PuedeVerNotas,
+    PuedeAnularNota,
+)
 
 from .models import Nota, HistorialNota, Adjunto, EstadoChoices, TipoEventoChoices
 from .serializers import (
@@ -35,8 +43,23 @@ class NotaViewSet(viewsets.ModelViewSet):
     - atrasadas: Lista notas atrasadas (acción custom)
     """
     queryset = Nota.objects.all()
-    permission_classes = [AllowAny]  # Temporal hasta Prompt 5
-    
+
+    def get_permissions(self):
+        """Permisos por acción según rol."""
+        if self.action in ('list', 'retrieve'):
+            return [EstaAutenticado(), PuedeVerNotas()]
+        if self.action == 'create':
+            return [EstaAutenticado(), PuedeCrearNota()]
+        if self.action in ('update', 'partial_update'):
+            return [EstaAutenticado(), EsDirectorJefeOAdmin()]
+        if self.action == 'cambiar_estado':
+            return [EstaAutenticado()]
+        if self.action == 'pendientes':
+            return [EstaAutenticado()]
+        if self.action == 'atrasadas':
+            return [EstaAutenticado(), PuedeVerTodasLasNotas()]
+        return [EstaAutenticado()]
+
     def get_serializer_class(self):
         """Retorna el serializer apropiado según la acción."""
         if self.action == 'list':
@@ -50,25 +73,33 @@ class NotaViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """
         Filtra las notas según los parámetros de consulta.
-        Filtros disponibles: estado, responsable, prioridad, atrasadas
+        Empleado solo ve notas donde es responsable o creador.
+        Filtros: estado, responsable, prioridad, atrasadas
         """
+        user = self.request.user
         queryset = Nota.objects.select_related('responsable', 'creado_por').all()
-        
+
+        # Restricción por rol: empleado solo ve asignadas o creadas por él
+        if user.is_authenticated and hasattr(user, 'puede_ver_todas_las_notas') and not user.puede_ver_todas_las_notas():
+            queryset = queryset.filter(
+                Q(responsable=user) | Q(creado_por=user)
+            )
+
         # Filtro por estado
         estado = self.request.query_params.get('estado', None)
         if estado:
             queryset = queryset.filter(estado=estado)
-        
+
         # Filtro por responsable
         responsable_id = self.request.query_params.get('responsable', None)
         if responsable_id:
             queryset = queryset.filter(responsable_id=responsable_id)
-        
+
         # Filtro por prioridad
         prioridad = self.request.query_params.get('prioridad', None)
         if prioridad:
             queryset = queryset.filter(prioridad=prioridad)
-        
+
         # Filtro por notas atrasadas
         atrasadas = self.request.query_params.get('atrasadas', None)
         if atrasadas and atrasadas.lower() == 'true':
@@ -78,7 +109,7 @@ class NotaViewSet(viewsets.ModelViewSet):
             ).exclude(
                 estado__in=[EstadoChoices.ARCHIVADA, EstadoChoices.ANULADA]
             )
-        
+
         return queryset.order_by('-fecha_ingreso')
     
     @transaction.atomic
@@ -216,6 +247,14 @@ class NotaViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        # Validar permiso para anular: solo Admin o Director
+        if estado_nuevo == EstadoChoices.ANULADA:
+            if not request.user.is_authenticated or not getattr(request.user, 'puede_anular_nota', lambda: False)():
+                return Response(
+                    {'error': 'Sin permiso', 'detalle': 'Solo Director o Administrador pueden anular notas.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
         
         # Validar motivo obligatorio
         estados_con_motivo = [
@@ -297,12 +336,6 @@ class NotaViewSet(viewsets.ModelViewSet):
         Lista las notas asignadas al usuario actual con estado:
         ASIGNADA, EN_PROCESO, EN_ESPERA
         """
-        if not request.user.is_authenticated:
-            return Response(
-                {'error': 'Autenticación requerida'},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-        
         queryset = Nota.objects.filter(
             responsable=request.user,
             estado__in=[
@@ -334,40 +367,48 @@ class NotaViewSet(viewsets.ModelViewSet):
 class HistorialNotaViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet de solo lectura para el historial de notas.
+    Solo se ven registros de notas que el usuario puede ver.
     """
     queryset = HistorialNota.objects.all()
     serializer_class = HistorialNotaSerializer
-    permission_classes = [AllowAny]  # Temporal hasta Prompt 5
-    
+    permission_classes = [EstaAutenticado, PuedeVerNotas]
+
     def get_queryset(self):
-        """Filtra el historial por nota si se proporciona el parámetro."""
+        """Filtra por nota y por visibilidad (empleado solo ve historial de sus notas)."""
+        user = self.request.user
         queryset = HistorialNota.objects.select_related(
             'nota', 'usuario', 'responsable_anterior', 'responsable_nuevo'
         ).all()
-        
+        if user.is_authenticated and hasattr(user, 'puede_ver_todas_las_notas') and not user.puede_ver_todas_las_notas():
+            queryset = queryset.filter(
+                Q(nota__responsable=user) | Q(nota__creado_por=user)
+            )
         nota_id = self.request.query_params.get('nota', None)
         if nota_id:
             queryset = queryset.filter(nota_id=nota_id)
-        
         return queryset.order_by('-fecha_hora')
 
 
 class AdjuntoViewSet(viewsets.ModelViewSet):
     """
     ViewSet para gestionar adjuntos de notas.
+    Solo se ven adjuntos de notas que el usuario puede ver.
     """
     queryset = Adjunto.objects.all()
     serializer_class = AdjuntoSerializer
-    permission_classes = [AllowAny]  # Temporal hasta Prompt 5
-    
+    permission_classes = [EstaAutenticado, PuedeVerNotas]
+
     def get_queryset(self):
-        """Filtra los adjuntos por nota si se proporciona el parámetro."""
+        """Filtra por nota y por visibilidad (empleado solo ve adjuntos de sus notas)."""
+        user = self.request.user
         queryset = Adjunto.objects.select_related('nota', 'subido_por').all()
-        
+        if user.is_authenticated and hasattr(user, 'puede_ver_todas_las_notas') and not user.puede_ver_todas_las_notas():
+            queryset = queryset.filter(
+                Q(nota__responsable=user) | Q(nota__creado_por=user)
+            )
         nota_id = self.request.query_params.get('nota', None)
         if nota_id:
             queryset = queryset.filter(nota_id=nota_id)
-        
         return queryset.order_by('-fecha_subida')
     
     def perform_create(self, serializer):
