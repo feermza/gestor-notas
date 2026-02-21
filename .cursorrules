@@ -14,7 +14,7 @@ formal de notas.
 - Servidor: Nginx + Gunicorn sobre Ubuntu Server 22.04
 - Entorno de desarrollo: Windows con Cursor
 
-## Roles de usuario
+## Roles de usuario (acceso al sistema)
 
 1. Administrador - gestión total del sistema
 2. Director - puede crear, revisar, asignar, reasignar, anular notas
@@ -44,78 +44,102 @@ INGRESADA → EN_REVISION → ASIGNADA → EN_PROCESO → RESUELTA → ARCHIVADA
 - RESUELTA → EN_PROCESO: Director, Jefe, Admin (requiere motivo)
 - Cualquier estado activo → ANULADA: Director, Admin (requiere motivo)
 
-## Modelo: Sector
+## Modelos de datos
+
+### Sector
 
 Campos: id, nombre, numero (identificador institucional), activo, descripcion
 Ejemplos: RRHH=150, Secretaría Académica=129
-Usado para: numeración de notas y clasificación de área de origen
+Usado para: numeración de notas, área de origen, distribución de resoluciones
 
-## Modelo: Nota
+### Agente
 
-Campos: id, numero_nota_externo (nullable), numero_nota_interno (generado),
-fecha_ingreso, fecha_limite, remitente, emisor_sector_id (FK Sector, nullable),
-emisor_externo (string, nullable), area_origen, tema, descripcion, prioridad,
-estado, canal_ingreso, responsable_id, creado_por_id, fecha_creacion,
-ultima_modificacion, anulada, motivo_anulacion, genera_resolucion (boolean),
-numero_resolucion (nullable), fecha_resolucion (nullable)
+Persona de la institución (puede o no tener acceso al sistema)
+Campos: id, apellido, nombre, legajo_numero, sector_id (FK), cargo,
+activo, usuario_id (FK Usuario nullable)
+Nota: Agente != Usuario. Un agente puede no tener login en el sistema.
 
-## Numeración de notas
+### Nota
 
-- Notas con expediente formal: {sector.numero}-{secuencia_anual}-{año}
-  Ejemplo: 150-0042-2025
-- Notas sin expediente (mail, WhatsApp, verbal): INT-{secuencia_anual}-{año}
-  Ejemplo: INT-0015-2025
-- La secuencia es por año, atómica (sin duplicados en concurrencia)
-- numero_nota_interno se genera siempre automáticamente
-- numero_nota_externo es opcional, para notas que ya traen su propio número
+Campos: id, numero_nota_externo (nullable), numero_nota_interno (generado siempre),
+fecha_ingreso, fecha_limite (nullable), remitente, emisor_sector_id (FK nullable),
+emisor_externo (string nullable), area_origen, tema, descripcion, prioridad,
+estado, canal_ingreso, responsable_id (FK Usuario), creado_por_id (FK Usuario),
+fecha_creacion, ultima_modificacion, anulada (bool), motivo_anulacion (nullable),
+genera_resolucion (bool), numero_resolucion (nullable), fecha_resolucion (nullable)
+Relación: una nota puede estar asociada a cero, uno o varios agentes (ManyToMany)
 
-## Modelo: HistorialNota (inmutable)
+### NotaAgente (tabla intermedia)
+
+Campos: id, nota_id (FK), agente_id (FK), observacion (nullable)
+
+### HistorialNota (inmutable, nunca se edita ni elimina)
 
 Campos: id, nota_id, usuario_id, fecha_hora, tipo_evento, estado_anterior,
 estado_nuevo, responsable_anterior, responsable_nuevo, descripcion_cambio,
 campos_modificados (JSONField)
 Tipos de evento: CREACION, CAMBIO_ESTADO, REASIGNACION, EDICION, COMENTARIO,
-ADJUNTO, ANULACION, DERIVACION_DESPACHO, RESOLUCION_CARGADA
+ADJUNTO, ANULACION, DERIVACION_DESPACHO, RESOLUCION_CARGADA, DISTRIBUCION_SECTOR
 
-## Modelo: Adjunto
+### Adjunto
 
-Campos: id, nota_id, nombre_archivo, ruta_almacenamiento, tipo_mime,
-tamaño_bytes, subido_por_id, fecha_subida, tipo_adjunto
+Campos: id, nota_id (FK), nombre_archivo, ruta_almacenamiento, tipo_mime,
+tamaño_bytes, subido_por_id (FK), fecha_subida, tipo_adjunto
 Tipos de adjunto: DOCUMENTO_ORIGINAL, BORRADOR_RESOLUCION, RESOLUCION_FINAL,
 NOTA_ESCANEADA, OTRO
 
-## Modelo: Usuario
+### LegajoDocumento
 
-Extiende AbstractUser. Campo adicional: rol
+Vincula documentos al legajo personal del agente en el servidor de RRHH
+Campos: id, agente_id (FK), nota_id (FK nullable), nombre_archivo,
+ruta_servidor, tipo_documento, fecha_carga, cargado_por_id (FK Usuario)
+Tipos: NOTA_ESCANEADA, RESOLUCION, ADJUNTO, OTRO
+Estructura de carpetas: /legajos/{legajo_numero}/{año}/
 
-## Flujo de derivación a Despacho
+### DistribucionResolucion
 
-Cuando una nota requiere resolución formal:
+Registro de envío de copias de resolución a otros sectores
+Campos: id, nota_id (FK), sector_destino_id (FK), fecha_envio,
+enviado_por_id (FK), medio (EMAIL, PAPEL, SISTEMA), observaciones
 
-1. Usuario adjunta borrador .docx en el sistema
-2. Sistema envía mail automático a Área de Despacho con el borrador adjunto
-3. Mail incluye copia (CC) a todos los usuarios de RRHH como constancia
-4. Se registra evento DERIVACION_DESPACHO en historial con fecha y hora
-5. Cuando llega la resolución final, se adjunta al sistema como RESOLUCION_FINAL
-6. Se registra evento RESOLUCION_CARGADA con numero_resolucion
+## Numeración de notas
 
-## Configuración de mail (Django SMTP)
+- Con expediente formal: {sector.numero}-{secuencia_anual}-{año}
+  Ejemplo: 150-0042-2025
+- Sin expediente (mail, WhatsApp, verbal): INT-{secuencia_anual}-{año}
+  Ejemplo: INT-0015-2025
+- numero_nota_interno se genera siempre automáticamente, nunca es null
+- numero_nota_externo es opcional
+
+## Flujo de resolución formal
+
+1. Usuario adjunta borrador .docx y marca genera_resolucion=True
+2. Sistema envía mail a Área de Despacho con borrador adjunto
+3. Mail incluye CC a todos los usuarios de RRHH como constancia
+4. Se registra evento DERIVACION_DESPACHO en historial
+5. Despacho confecciona la resolución final
+6. RRHH adjunta resolución final como RESOLUCION_FINAL
+7. Se registra numero_resolucion y fecha_resolucion en la nota
+8. Se registra evento RESOLUCION_CARGADA en historial
+9. Opcionalmente se envía copia a otros sectores (DistribucionResolucion)
+10. Los documentos elegidos se guardan en LegajoDocumento del/los agentes
+
+## Configuración de mail
 
 Variables en .env: EMAIL_HOST, EMAIL_PORT, EMAIL_HOST_USER,
 EMAIL_HOST_PASSWORD, EMAIL_USE_TLS, EMAIL_DESTINATARIO_DESPACHO
-Por definir: servidor SMTP institucional (Gmail, Outlook, u otro)
+Servidor SMTP: por definir (Gmail, Outlook institucional u otro)
 
 ## Reglas de negocio críticas
 
-- Nunca se borra una nota físicamente (solo borrado lógico o anulación con motivo)
-- El historial de cambios es inmutable, nunca se edita ni elimina
-- Toda nota pasa obligatoriamente por EN_REVISION antes de asignarse
+- Nunca se borra una nota físicamente
+- El historial es inmutable
+- Toda nota pasa por EN_REVISION antes de asignarse
 - Director y Jefe pueden autoasignarse notas
-- El responsable puede archivar directamente sin validación adicional
-- DEVUELTA requiere motivo obligatorio
-- EN_ESPERA requiere motivo obligatorio
-- ANULADA requiere motivo obligatorio
+- El responsable archiva directamente sin validación adicional
+- DEVUELTA, EN_ESPERA y ANULADA requieren motivo obligatorio
 - numero_nota_interno se genera siempre, nunca es null
+- Una nota puede tener cero, uno o varios agentes asociados
 
 ## Permisos por rol
 
@@ -126,9 +150,12 @@ Por definir: servidor SMTP institucional (Gmail, Outlook, u otro)
 - Cambiar estado: según tabla de transiciones
 - Anular nota: Admin, Director
 - Eliminar físicamente: nadie
-- Gestionar usuarios: solo Admin
+- Gestionar usuarios y sectores: solo Admin
+- Gestionar agentes: Admin, Director, Jefe
 - Ver reportes: Admin, Director, Jefe, Solo Lectura
 - Derivar a Despacho: Admin, Director, Jefe
+- Cargar en legajo: Admin, Director, Jefe
+- Distribuir resolución a sectores: Admin, Director, Jefe
 
 ## Convenciones de código
 
@@ -141,28 +168,30 @@ Por definir: servidor SMTP institucional (Gmail, Outlook, u otro)
 
 ## Fase actual: MVP
 
-1. Registro de notas con todos los campos y numeración automática
+1. Registro de notas con numeración automática
 2. Flujo completo de estados con transiciones controladas
 3. Asignación y reasignación de responsables
-4. Historial inmutable de movimientos
-5. Carga de adjuntos con tipos definidos
-6. Listado de notas pendientes por persona
-7. Listado de notas atrasadas
-8. Login con roles y control de sesiones
-9. Panel administrativo básico
-10. Tabla de sectores con sus números identificadores
+4. Asociación de agentes a notas (cero, uno o varios)
+5. Historial inmutable de movimientos
+6. Carga de adjuntos con tipos definidos
+7. Listado de notas pendientes por persona
+8. Listado de notas atrasadas
+9. Login con roles y control de sesiones
+10. Panel administrativo básico
+11. Gestión de sectores y agentes
 
 ## Fuera del MVP — Fase 2
 
 - Envío de mail automático para derivación a Despacho
-- Notificaciones por mail al asignar una nota o al vencer fecha límite
+- Notificaciones por mail al asignar nota o al vencer fecha límite
+- Distribución de resoluciones a sectores con registro
+- Carga de documentos en legajo personal del servidor de RRHH
 - Reportes mensuales exportables
 - Búsqueda avanzada con múltiples filtros
 
 ## Mejoras futuras — Fase 3
 
-- Dashboard con indicadores: notas por estado, atrasadas, pendientes por
-  persona, ingresadas por mes (PrimeVue Cards + Chart.js)
+- Dashboard con indicadores clave (PrimeVue Cards + Chart.js)
 - Integración automática con buzón de mail entrante
 - Integración con sistema de resoluciones externo vía API
 - Extensión a otras áreas de la institución
