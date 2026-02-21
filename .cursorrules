@@ -2,17 +2,17 @@
 
 ## Descripción del proyecto
 
-Sistema web para gestión y seguimiento de notas que ingresan a una oficina de Recursos Humanos.
-Problema principal: falta de trazabilidad y seguimiento formal de notas.
+Sistema web para gestión y seguimiento de notas que ingresan a una oficina
+de Recursos Humanos. Problema principal: falta de trazabilidad y seguimiento
+formal de notas.
 
 ## Stack tecnológico
 
 - Backend: Django 4.x + Django REST Framework
-- Frontend: Vue 3 + Vite + PrimeVue (o Vuetify)
+- Frontend: Vue 3 + Vite + PrimeVue + Tailwind CSS
 - Base de datos: PostgreSQL 15
 - Servidor: Nginx + Gunicorn sobre Ubuntu Server 22.04
 - Entorno de desarrollo: Windows con Cursor
-- IDE: Cursor con Composer para desarrollo asistido por IA
 
 ## Roles de usuario
 
@@ -44,26 +44,66 @@ INGRESADA → EN_REVISION → ASIGNADA → EN_PROCESO → RESUELTA → ARCHIVADA
 - RESUELTA → EN_PROCESO: Director, Jefe, Admin (requiere motivo)
 - Cualquier estado activo → ANULADA: Director, Admin (requiere motivo)
 
-## Modelo principal: Nota
+## Modelo: Sector
 
-Campos: id, numero_nota, fecha_ingreso, fecha_limite, remitente, area_origen,
-tema, descripcion, prioridad, estado, canal_ingreso, responsable_id,
-creado_por_id, fecha_creacion, ultima_modificacion, anulada, motivo_anulacion
+Campos: id, nombre, numero (identificador institucional), activo, descripcion
+Ejemplos: RRHH=150, Secretaría Académica=129
+Usado para: numeración de notas y clasificación de área de origen
+
+## Modelo: Nota
+
+Campos: id, numero_nota_externo (nullable), numero_nota_interno (generado),
+fecha_ingreso, fecha_limite, remitente, emisor_sector_id (FK Sector, nullable),
+emisor_externo (string, nullable), area_origen, tema, descripcion, prioridad,
+estado, canal_ingreso, responsable_id, creado_por_id, fecha_creacion,
+ultima_modificacion, anulada, motivo_anulacion, genera_resolucion (boolean),
+numero_resolucion (nullable), fecha_resolucion (nullable)
+
+## Numeración de notas
+
+- Notas con expediente formal: {sector.numero}-{secuencia_anual}-{año}
+  Ejemplo: 150-0042-2025
+- Notas sin expediente (mail, WhatsApp, verbal): INT-{secuencia_anual}-{año}
+  Ejemplo: INT-0015-2025
+- La secuencia es por año, atómica (sin duplicados en concurrencia)
+- numero_nota_interno se genera siempre automáticamente
+- numero_nota_externo es opcional, para notas que ya traen su propio número
 
 ## Modelo: HistorialNota (inmutable)
 
 Campos: id, nota_id, usuario_id, fecha_hora, tipo_evento, estado_anterior,
 estado_nuevo, responsable_anterior, responsable_nuevo, descripcion_cambio,
 campos_modificados (JSONField)
+Tipos de evento: CREACION, CAMBIO_ESTADO, REASIGNACION, EDICION, COMENTARIO,
+ADJUNTO, ANULACION, DERIVACION_DESPACHO, RESOLUCION_CARGADA
 
 ## Modelo: Adjunto
 
 Campos: id, nota_id, nombre_archivo, ruta_almacenamiento, tipo_mime,
-tamaño_bytes, subido_por_id, fecha_subida
+tamaño_bytes, subido_por_id, fecha_subida, tipo_adjunto
+Tipos de adjunto: DOCUMENTO_ORIGINAL, BORRADOR_RESOLUCION, RESOLUCION_FINAL,
+NOTA_ESCANEADA, OTRO
 
 ## Modelo: Usuario
 
-Extiende AbstractUser. Campo adicional: rol (choices: ADMIN, DIRECTOR, JEFE, EMPLEADO, SOLO_LECTURA)
+Extiende AbstractUser. Campo adicional: rol
+
+## Flujo de derivación a Despacho
+
+Cuando una nota requiere resolución formal:
+
+1. Usuario adjunta borrador .docx en el sistema
+2. Sistema envía mail automático a Área de Despacho con el borrador adjunto
+3. Mail incluye copia (CC) a todos los usuarios de RRHH como constancia
+4. Se registra evento DERIVACION_DESPACHO en historial con fecha y hora
+5. Cuando llega la resolución final, se adjunta al sistema como RESOLUCION_FINAL
+6. Se registra evento RESOLUCION_CARGADA con numero_resolucion
+
+## Configuración de mail (Django SMTP)
+
+Variables en .env: EMAIL_HOST, EMAIL_PORT, EMAIL_HOST_USER,
+EMAIL_HOST_PASSWORD, EMAIL_USE_TLS, EMAIL_DESTINATARIO_DESPACHO
+Por definir: servidor SMTP institucional (Gmail, Outlook, u otro)
 
 ## Reglas de negocio críticas
 
@@ -75,7 +115,7 @@ Extiende AbstractUser. Campo adicional: rol (choices: ADMIN, DIRECTOR, JEFE, EMP
 - DEVUELTA requiere motivo obligatorio
 - EN_ESPERA requiere motivo obligatorio
 - ANULADA requiere motivo obligatorio
-- La numeración numero_nota se genera automáticamente: NOTA-YYYY-NNNN
+- numero_nota_interno se genera siempre, nunca es null
 
 ## Permisos por rol
 
@@ -88,6 +128,7 @@ Extiende AbstractUser. Campo adicional: rol (choices: ADMIN, DIRECTOR, JEFE, EMP
 - Eliminar físicamente: nadie
 - Gestionar usuarios: solo Admin
 - Ver reportes: Admin, Director, Jefe, Solo Lectura
+- Derivar a Despacho: Admin, Director, Jefe
 
 ## Convenciones de código
 
@@ -95,34 +136,38 @@ Extiende AbstractUser. Campo adicional: rol (choices: ADMIN, DIRECTOR, JEFE, EMP
 - Vue: Composition API, <script setup>, camelCase para props
 - API REST: endpoints en español siguiendo el modelo de datos
 - Variables de entorno en archivo .env (nunca hardcodear credenciales)
-- Un modelo por archivo en Django cuando sea posible
 - Comentarios en español
 - Commits en español con prefijos: feat, fix, refactor, docs
 
-## Estructura de apps Django
-
-- "usuarios" → modelo de usuario personalizado con roles
-- "notas" → modelos Nota, HistorialNota, Adjunto
-- "reportes" → vistas para listados y reportes
-
 ## Fase actual: MVP
 
-1. Registro de notas con todos los campos
+1. Registro de notas con todos los campos y numeración automática
 2. Flujo completo de estados con transiciones controladas
 3. Asignación y reasignación de responsables
 4. Historial inmutable de movimientos
-5. Carga de adjuntos
+5. Carga de adjuntos con tipos definidos
 6. Listado de notas pendientes por persona
 7. Listado de notas atrasadas
 8. Login con roles y control de sesiones
 9. Panel administrativo básico
+10. Tabla de sectores con sus números identificadores
 
-## Fuera del MVP (no sugerir ni implementar todavía)
+## Fuera del MVP — Fase 2
 
-- Notificaciones automáticas por email o WhatsApp
-- Dashboard con métricas avanzadas
-- Integración con otros sistemas
-- Docker
+- Envío de mail automático para derivación a Despacho
+- Notificaciones por mail al asignar una nota o al vencer fecha límite
+- Reportes mensuales exportables
+- Búsqueda avanzada con múltiples filtros
+
+## Mejoras futuras — Fase 3
+
+- Dashboard con indicadores: notas por estado, atrasadas, pendientes por
+  persona, ingresadas por mes (PrimeVue Cards + Chart.js)
+- Integración automática con buzón de mail entrante
+- Integración con sistema de resoluciones externo vía API
+- Extensión a otras áreas de la institución
+- Sistema de gestión documental completo
+- Docker para despliegue
 - App móvil o PWA
-- MinIO para almacenamiento de adjuntos
+- MinIO para almacenamiento de adjuntos en escala
 - Firma digital
