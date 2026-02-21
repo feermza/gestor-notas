@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Variables CSS institucionales */
+:root {
+  --color-primario: #1e3a5f;
+  --color-secundario: #2d6a9f;
+  --color-acento: #e8f4fd;
+  --color-alerta: #e74c3c;
+  --color-ok: #27ae60;
+}
+
+/* Base para que Tailwind y PrimeVue coexistan */
+@layer base {
+  body {
+    @apply antialiased text-gray-800 bg-gray-50;
+  }
+}
