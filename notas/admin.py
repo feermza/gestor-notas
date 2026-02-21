@@ -1,47 +1,111 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import Nota, HistorialNota, Adjunto
+from .models import (
+    Sector,
+    Agente,
+    Nota,
+    NotaAgente,
+    HistorialNota,
+    Adjunto,
+    LegajoDocumento,
+    DistribucionResolucion,
+)
+
+
+@admin.register(Sector)
+class SectorAdmin(admin.ModelAdmin):
+    """Administración del modelo Sector."""
+    list_display = ['numero', 'nombre', 'activo']
+    list_filter = ['activo']
+    search_fields = ['nombre', 'descripcion']
+    ordering = ['numero']
+
+
+@admin.register(Agente)
+class AgenteAdmin(admin.ModelAdmin):
+    """Administración del modelo Agente."""
+    list_display = ['legajo_numero', 'apellido', 'nombre', 'sector', 'cargo', 'activo', 'usuario']
+    list_filter = ['activo', 'sector']
+    search_fields = ['apellido', 'nombre', 'legajo_numero', 'cargo']
+    list_editable = ['activo']
+    autocomplete_fields = ['sector', 'usuario']
+    ordering = ['apellido', 'nombre']
+
+
+class NotaAgenteInline(admin.TabularInline):
+    """Inline para gestionar agentes asociados a una nota."""
+    model = NotaAgente
+    extra = 0
+    autocomplete_fields = ['agente']
 
 
 @admin.register(Nota)
 class NotaAdmin(admin.ModelAdmin):
     """Administración del modelo Nota."""
     
-    # Campos a mostrar en el listado
     list_display = [
-        'numero_nota', 
-        'tema', 
-        'estado', 
-        'prioridad', 
-        'responsable', 
-        'fecha_limite', 
+        'numero_nota_interno',
+        'numero_nota_externo',
+        'tema',
+        'estado',
+        'prioridad',
+        'responsable',
+        'fecha_limite',
         'fecha_ingreso',
-        'get_area_origen_display'
+        'get_area_origen_display',
     ]
-    list_display_links = ['numero_nota', 'tema']
+    list_display_links = ['numero_nota_interno', 'tema']
     
-    # Campos editables desde el listado
     list_editable = ['estado', 'responsable']
     
-    # Filtros laterales
-    list_filter = ['estado', 'prioridad', 'area_origen', 'canal_ingreso', 'anulada', 'fecha_ingreso']
+    list_filter = [
+        'estado',
+        'prioridad',
+        'area_origen',
+        'canal_ingreso',
+        'anulada',
+        'fecha_ingreso',
+        'genera_resolucion',
+    ]
     
-    # Campos de búsqueda
-    search_fields = ['numero_nota', 'tema', 'remitente', 'descripcion', 'area_origen']
+    search_fields = [
+        'numero_nota_interno',
+        'numero_nota_externo',
+        'tema',
+        'remitente',
+        'descripcion',
+        'area_origen',
+    ]
     
-    # Ordenamiento por defecto
     ordering = ['-fecha_ingreso']
     
-    # Campos en el formulario de edición
     fieldsets = (
-        ('Información Básica', {
-            'fields': ('numero_nota', 'fecha_ingreso', 'fecha_limite')
+        ('Numeración', {
+            'fields': ('numero_nota_interno', 'numero_nota_externo')
         }),
-        ('Contenido', {
-            'fields': ('remitente', 'area_origen', 'tema', 'descripcion')
+        ('Información Básica', {
+            'fields': ('fecha_ingreso', 'fecha_limite')
+        }),
+        ('Origen y Contenido', {
+            'fields': (
+                'remitente',
+                'emisor_sector',
+                'emisor_externo',
+                'area_origen',
+                'tema',
+                'descripcion',
+            )
         }),
         ('Estado y Asignación', {
             'fields': ('estado', 'prioridad', 'responsable', 'canal_ingreso')
+        }),
+        ('Resolución', {
+            'fields': (
+                'genera_resolucion',
+                'numero_resolucion',
+                'fecha_resolucion',
+            ),
+            'classes': ('collapse',)
         }),
         ('Control', {
             'fields': ('anulada', 'motivo_anulacion', 'creado_por'),
@@ -49,11 +113,15 @@ class NotaAdmin(admin.ModelAdmin):
         }),
     )
     
-    # Campos de solo lectura
-    readonly_fields = ['numero_nota', 'fecha_creacion', 'ultima_modificacion', 'creado_por']
+    readonly_fields = [
+        'numero_nota_interno',
+        'fecha_creacion',
+        'ultima_modificacion',
+        'creado_por',
+    ]
     
-    # Autocompletar responsable
-    autocomplete_fields = ['responsable', 'creado_por']
+    autocomplete_fields = ['emisor_sector', 'responsable', 'creado_por']
+    inlines = [NotaAgenteInline]
     
     def get_area_origen_display(self, obj):
         """Muestra el área de origen."""
@@ -62,36 +130,40 @@ class NotaAdmin(admin.ModelAdmin):
     get_area_origen_display.admin_order_field = 'area_origen'
     
     def get_queryset(self, request):
-        """Optimiza las consultas con select_related."""
         qs = super().get_queryset(request)
-        return qs.select_related('responsable', 'creado_por')
+        return qs.select_related(
+            'responsable',
+            'creado_por',
+            'emisor_sector',
+        )
 
 
 @admin.register(HistorialNota)
 class HistorialNotaAdmin(admin.ModelAdmin):
     """Administración del modelo HistorialNota (solo lectura)."""
     
-    # Campos a mostrar en el listado
     list_display = [
-        'nota', 
-        'usuario', 
-        'fecha_hora', 
-        'tipo_evento', 
-        'estado_anterior', 
-        'estado_nuevo'
+        'nota',
+        'usuario',
+        'fecha_hora',
+        'tipo_evento',
+        'estado_anterior',
+        'estado_nuevo',
     ]
     list_display_links = ['nota']
     
-    # Filtros laterales
     list_filter = ['tipo_evento', 'fecha_hora', 'estado_anterior', 'estado_nuevo']
     
-    # Campos de búsqueda
-    search_fields = ['nota__numero_nota', 'nota__tema', 'usuario__username', 'usuario__email']
+    search_fields = [
+        'nota__numero_nota_interno',
+        'nota__numero_nota_externo',
+        'nota__tema',
+        'usuario__username',
+        'usuario__email',
+    ]
     
-    # Ordenamiento por defecto
     ordering = ['-fecha_hora']
     
-    # Campos en el formulario de edición (todos readonly)
     fieldsets = (
         ('Información Principal', {
             'fields': ('nota', 'usuario', 'fecha_hora', 'tipo_evento')
@@ -109,63 +181,65 @@ class HistorialNotaAdmin(admin.ModelAdmin):
         }),
     )
     
-    # Todos los campos son de solo lectura
     readonly_fields = [
-        'nota', 
-        'usuario', 
-        'fecha_hora', 
-        'tipo_evento', 
-        'estado_anterior', 
+        'nota',
+        'usuario',
+        'fecha_hora',
+        'tipo_evento',
+        'estado_anterior',
         'estado_nuevo',
         'responsable_anterior',
         'responsable_nuevo',
         'descripcion_cambio',
-        'campos_modificados'
+        'campos_modificados',
     ]
     
-    # Deshabilitar acciones de eliminación y creación
     def has_add_permission(self, request):
-        """No permite agregar registros manualmente."""
         return False
     
     def has_delete_permission(self, request, obj=None):
-        """No permite eliminar registros del historial."""
         return False
     
     def get_queryset(self, request):
-        """Optimiza las consultas con select_related."""
         qs = super().get_queryset(request)
-        return qs.select_related('nota', 'usuario', 'responsable_anterior', 'responsable_nuevo')
+        return qs.select_related(
+            'nota',
+            'usuario',
+            'responsable_anterior',
+            'responsable_nuevo',
+        )
 
 
 @admin.register(Adjunto)
 class AdjuntoAdmin(admin.ModelAdmin):
     """Administración del modelo Adjunto."""
     
-    # Campos a mostrar en el listado
     list_display = [
-        'nota', 
-        'nombre_archivo', 
-        'subido_por', 
+        'nota',
+        'nombre_archivo',
+        'tipo_adjunto',
+        'subido_por',
         'fecha_subida',
         'get_tamaño_formateado',
-        'tipo_mime'
+        'tipo_mime',
     ]
     list_display_links = ['nota', 'nombre_archivo']
     
-    # Filtros laterales
-    list_filter = ['fecha_subida', 'tipo_mime']
+    list_filter = ['fecha_subida', 'tipo_mime', 'tipo_adjunto']
     
-    # Campos de búsqueda
-    search_fields = ['nota__numero_nota', 'nota__tema', 'nombre_archivo', 'subido_por__username']
+    search_fields = [
+        'nota__numero_nota_interno',
+        'nota__numero_nota_externo',
+        'nota__tema',
+        'nombre_archivo',
+        'subido_por__username',
+    ]
     
-    # Ordenamiento por defecto
     ordering = ['-fecha_subida']
     
-    # Campos en el formulario de edición
     fieldsets = (
         ('Información Principal', {
-            'fields': ('nota', 'nombre_archivo', 'subido_por', 'fecha_subida')
+            'fields': ('nota', 'nombre_archivo', 'tipo_adjunto', 'subido_por', 'fecha_subida')
         }),
         ('Detalles del Archivo', {
             'fields': ('ruta_almacenamiento', 'tipo_mime', 'tamaño_bytes'),
@@ -173,19 +247,36 @@ class AdjuntoAdmin(admin.ModelAdmin):
         }),
     )
     
-    # Campos de solo lectura
     readonly_fields = ['fecha_subida']
-    
-    # Autocompletar
     autocomplete_fields = ['nota', 'subido_por']
     
     def get_tamaño_formateado(self, obj):
-        """Muestra el tamaño del archivo formateado."""
         return obj.tamaño_formateado()
     get_tamaño_formateado.short_description = 'Tamaño'
     get_tamaño_formateado.admin_order_field = 'tamaño_bytes'
     
     def get_queryset(self, request):
-        """Optimiza las consultas con select_related."""
         qs = super().get_queryset(request)
         return qs.select_related('nota', 'subido_por')
+
+
+@admin.register(LegajoDocumento)
+class LegajoDocumentoAdmin(admin.ModelAdmin):
+    """Administración del modelo LegajoDocumento."""
+    list_display = ['agente', 'nota', 'nombre_archivo', 'tipo_documento', 'fecha_carga', 'cargado_por']
+    list_filter = ['tipo_documento', 'fecha_carga']
+    search_fields = ['agente__apellido', 'agente__nombre', 'agente__legajo_numero', 'nombre_archivo']
+    autocomplete_fields = ['agente', 'nota', 'cargado_por']
+    readonly_fields = ['fecha_carga']
+    ordering = ['-fecha_carga']
+
+
+@admin.register(DistribucionResolucion)
+class DistribucionResolucionAdmin(admin.ModelAdmin):
+    """Administración del modelo DistribucionResolucion."""
+    list_display = ['nota', 'sector_destino', 'medio', 'fecha_envio', 'enviado_por']
+    list_filter = ['medio', 'fecha_envio']
+    search_fields = ['nota__numero_nota_interno', 'sector_destino__nombre']
+    autocomplete_fields = ['nota', 'sector_destino', 'enviado_por']
+    readonly_fields = ['fecha_envio']
+    ordering = ['-fecha_envio']
