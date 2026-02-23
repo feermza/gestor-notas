@@ -7,17 +7,25 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 /**
- * Obtiene el token CSRF de la cookie (Django lo envía como csrftoken).
- * Necesario para POST/PATCH/DELETE cuando se usa SessionAuthentication.
+ * Lee el valor de una cookie por nombre.
+ * @param {string} name - Nombre de la cookie
+ * @returns {string|null} Valor o null si no existe
  */
-function getCsrfToken() {
-  const name = 'csrftoken'
+function getCookie(name) {
   const cookies = document.cookie.split(';')
   for (let i = 0; i < cookies.length; i++) {
     const c = cookies[i].trim()
     if (c.startsWith(name + '=')) return c.substring(name.length + 1)
   }
   return null
+}
+
+/**
+ * Obtiene el token CSRF de la cookie (Django lo envía como csrftoken).
+ * Necesario para POST/PATCH/DELETE cuando se usa SessionAuthentication.
+ */
+function getCsrfToken() {
+  return getCookie('csrftoken')
 }
 
 /**

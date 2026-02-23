@@ -3,6 +3,7 @@ Vistas de autenticación y perfil de usuario.
 Usa sesiones Django (no JWT).
 """
 from django.contrib.auth import authenticate, login, logout
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -23,6 +24,7 @@ def _datos_usuario(usuario):
     }
 
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
@@ -63,6 +65,7 @@ def login_view(request):
     }, status=status.HTTP_200_OK)
 
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([EstaAutenticado])
 def logout_view(request):
@@ -74,6 +77,7 @@ def logout_view(request):
     )
 
 
+@csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def perfil_view(request):

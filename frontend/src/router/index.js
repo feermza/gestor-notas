@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import LoginView from '@/views/LoginView.vue'
+import LoginNuevo from '@/views/LoginNuevo.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import MainLayout from '@/layouts/MainLayout.vue'
 
@@ -13,6 +14,14 @@ const router = createRouter({
       component: LoginView,
       meta: { public: true },
     },
+
+    {
+      path: '/login-test',
+      name: 'login-test',
+      component: LoginNuevo,
+      meta: { public: true },
+    },
+
     {
       path: '/',
       component: MainLayout,

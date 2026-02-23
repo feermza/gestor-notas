@@ -116,8 +116,8 @@ async function enviar() {
 
 /* 2. TARJETA glassmorphism */
 .login-card {
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(25px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 1.5rem;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
@@ -217,7 +217,7 @@ async function enviar() {
 }
 
 /* 6. BOTÓN INGRESAR */
-.login-btn :deep(.p-button) {
+.login-btn {
   background: #1e3a5f !important;
   border: none !important;
   color: #fff !important;
