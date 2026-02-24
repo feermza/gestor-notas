@@ -21,6 +21,7 @@ import Sidebar from 'primevue/sidebar'
 import Toolbar from 'primevue/toolbar'
 import Badge from 'primevue/badge'
 import ProgressBar from 'primevue/progressbar'
+import Skeleton from 'primevue/skeleton'
 
 import App from './App.vue'
 import router from './router'
@@ -52,6 +53,7 @@ app.component('Sidebar', Sidebar)
 app.component('Toolbar', Toolbar)
 app.component('Badge', Badge)
 app.component('ProgressBar', ProgressBar)
+app.component('Skeleton', Skeleton)
 
 app.use(createPinia())
 app.use(router)
