@@ -59,16 +59,16 @@ const router = createRouter({
 })
 
 // Guardia de navegación: requiere auth o redirige a login
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, from) => {
   const authStore = useAuthStore()
 
   // Si la ruta es pública (/login)
   if (to.meta.public) {
     // Si ya está logueado, redirigir al dashboard
     if (authStore.estaLogueado) {
-      return next('/')
+      return '/'
     }
-    return next()
+    return true
   }
 
   // Si la ruta requiere autenticación
@@ -80,12 +80,12 @@ router.beforeEach(async (to, from, next) => {
 
     // Si después de cargarUsuario() sigue sin haber usuario, redirigir a login
     if (!authStore.usuario) {
-      return next('/login')
+      return '/login'
     }
   }
 
   // Permitir acceso
-  next()
+  return true
 })
 
 export default router
