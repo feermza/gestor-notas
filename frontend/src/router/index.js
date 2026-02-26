@@ -4,6 +4,7 @@ import LoginView from '@/views/LoginView.vue'
 import LoginNuevo from '@/views/LoginNuevo.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import MainLayout from '@/layouts/MainLayout.vue'
+// NotasView se carga con lazy loading
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -32,10 +33,16 @@ const router = createRouter({
           name: 'dashboard',
           component: DashboardView,
         },
-        // Placeholder para rutas futuras (Notas, Pendientes, Atrasadas)
+        // Listado de notas
         {
           path: 'notas',
           name: 'notas',
+          component: () => import('@/views/NotasView.vue'),
+        },
+        // Placeholder detalle de nota (por ahora)
+        {
+          path: 'notas/:id',
+          name: 'nota-detalle',
           component: () => import('@/views/DashboardView.vue'),
         },
         {

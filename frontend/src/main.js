@@ -22,6 +22,8 @@ import Toolbar from 'primevue/toolbar'
 import Badge from 'primevue/badge'
 import ProgressBar from 'primevue/progressbar'
 import Skeleton from 'primevue/skeleton'
+import Dropdown from 'primevue/dropdown'
+import Tooltip from 'primevue/tooltip'
 
 import App from './App.vue'
 import router from './router'
@@ -54,6 +56,8 @@ app.component('Toolbar', Toolbar)
 app.component('Badge', Badge)
 app.component('ProgressBar', ProgressBar)
 app.component('Skeleton', Skeleton)
+app.component('Dropdown', Dropdown)
+app.directive('tooltip', Tooltip)
 
 app.use(createPinia())
 app.use(router)

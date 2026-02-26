@@ -2,6 +2,15 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { get } from '@/api/cliente'
+import {
+  truncar,
+  formatoFecha,
+  haceCuanto,
+  colorEstado,
+  labelEstado,
+  esDelMesActual,
+  esHoy,
+} from '@/utils/notas'
 
 const router = useRouter()
 
@@ -43,87 +52,6 @@ const fechaActual = computed(() => {
   const anio = ahora.getFullYear()
   return `${dia}, ${numero} de ${mes} de ${anio}`
 })
-
-// Colores de estado para Tags (según especificación)
-const COLORES_ESTADO = {
-  INGRESADA: '#64748b',
-  EN_REVISION: '#2d6a9f',
-  ASIGNADA: '#f59e0b',
-  EN_PROCESO: '#1e3a5f',
-  EN_ESPERA: '#d97706',
-  DEVUELTA: '#ef4444',
-  RESUELTA: '#27ae60',
-  ARCHIVADA: '#94a3b8',
-  ANULADA: '#991b1b',
-}
-
-const LABELS_ESTADO = {
-  INGRESADA: 'Ingresada',
-  EN_REVISION: 'En Revisión',
-  ASIGNADA: 'Asignada',
-  EN_PROCESO: 'En Proceso',
-  EN_ESPERA: 'En Espera',
-  DEVUELTA: 'Devuelta',
-  RESUELTA: 'Resuelta',
-  ARCHIVADA: 'Archivada',
-  ANULADA: 'Anulada',
-}
-
-function truncar(texto, max = 40) {
-  if (!texto) return ''
-  return texto.length <= max ? texto : texto.slice(0, max) + '…'
-}
-
-function formatoFecha(fechaStr) {
-  if (!fechaStr) return '—'
-  const d = new Date(fechaStr + 'T12:00:00')
-  return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-
-/** "hace X minutos", "hace 2 horas", "ayer", "hace 3 días" */
-function haceCuanto(fechaStr) {
-  if (!fechaStr) return '—'
-  const fecha = new Date(fechaStr + 'T12:00:00')
-  const ahora = new Date()
-  const diffMs = ahora - fecha
-  const diffDias = Math.floor(diffMs / (24 * 60 * 60 * 1000))
-  const diffHoras = Math.floor(diffMs / (60 * 60 * 1000))
-  const diffMin = Math.floor(diffMs / (60 * 1000))
-
-  if (diffMin < 60) return diffMin <= 1 ? 'hace un momento' : `hace ${diffMin} minutos`
-  if (diffHoras < 24) return diffHoras === 1 ? 'hace 1 hora' : `hace ${diffHoras} horas`
-  if (diffDias === 1) return 'ayer'
-  if (diffDias < 7) return `hace ${diffDias} días`
-  return formatoFecha(fechaStr)
-}
-
-function colorEstado(estado) {
-  return COLORES_ESTADO[estado] || '#64748b'
-}
-
-function labelEstado(estado) {
-  return LABELS_ESTADO[estado] || estado || '—'
-}
-
-/** Devuelve true si fecha_ingreso está en el mes actual */
-function esDelMesActual(fechaStr) {
-  if (!fechaStr) return false
-  const d = new Date(fechaStr + 'T12:00:00')
-  const hoy = new Date()
-  return d.getFullYear() === hoy.getFullYear() && d.getMonth() === hoy.getMonth()
-}
-
-/** Devuelve true si fecha_ingreso es hoy */
-function esHoy(fechaStr) {
-  if (!fechaStr) return false
-  const d = new Date(fechaStr + 'T12:00:00')
-  const hoy = new Date()
-  return (
-    d.getFullYear() === hoy.getFullYear() &&
-    d.getMonth() === hoy.getMonth() &&
-    d.getDate() === hoy.getDate()
-  )
-}
 
 async function cargarDashboard() {
   cargando.value = true
@@ -177,7 +105,7 @@ onMounted(cargarDashboard)
 </script>
 
 <template>
-  <div class="dashboard min-h-full" style="background-color: #f8fafc">
+  <div class="dashboard min-h-full" style="background-color: #eef2f7">
     <div class="p-4 md:p-6">
       <!-- Título y fecha -->
       <header class="mb-6">

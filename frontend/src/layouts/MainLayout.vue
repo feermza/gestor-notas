@@ -12,11 +12,13 @@ const menuItems = computed(() => {
   const items = [
     { label: 'Inicio', icon: 'pi pi-home', to: '/' },
     { label: 'Notas', icon: 'pi pi-list', to: '/notas' },
-    { label: 'Nueva Nota', icon: 'pi pi-plus', to: '/notas/nueva' },
     { label: 'Pendientes', icon: 'pi pi-clock', to: '/notas/pendientes' },
   ]
   // Solo roles con permiso ven "Atrasadas"
-  if (auth.usuario?.rol && ['ADMIN', 'DIRECTOR', 'JEFE', 'SOLO_LECTURA'].includes(auth.usuario.rol)) {
+  if (
+    auth.usuario?.rol &&
+    ['ADMIN', 'DIRECTOR', 'JEFE', 'SOLO_LECTURA'].includes(auth.usuario.rol)
+  ) {
     items.push({ label: 'Atrasadas', icon: 'pi pi-exclamation-triangle', to: '/notas/atrasadas' })
   }
   return items.map((item) => ({
@@ -54,7 +56,9 @@ async function cerrarSesion() {
         <span class="font-semibold text-lg">Gestor de Notas - RRHH</span>
       </div>
       <div class="flex items-center gap-3">
-        <span class="text-sm hidden sm:inline">{{ auth.nombreCompleto || auth.usuario?.username }}</span>
+        <span class="text-sm hidden sm:inline">{{
+          auth.nombreCompleto || auth.usuario?.username
+        }}</span>
         <Avatar
           :label="(auth.nombreCompleto || auth.usuario?.username || 'U').charAt(0).toUpperCase()"
           class="bg-white text-primario"
@@ -73,11 +77,7 @@ async function cerrarSesion() {
 
     <div class="flex flex-1 overflow-hidden">
       <!-- Sidebar móvil (drawer) -->
-      <Sidebar
-        v-model:visible="sidebarVisible"
-        position="left"
-        class="w-64 lg:!hidden"
-      >
+      <Sidebar v-model:visible="sidebarVisible" position="left" class="w-64 lg:!hidden">
         <template #header>
           <span class="font-semibold text-gray-800">Menú</span>
         </template>
@@ -110,7 +110,11 @@ async function cerrarSesion() {
             :key="item.to"
             :to="item.to"
             class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors"
-            :class="route.path === item.to ? 'bg-gray-100 font-medium text-primario' : 'text-gray-700 hover:bg-gray-50'"
+            :class="
+              route.path === item.to
+                ? 'bg-gray-100 font-medium text-primario'
+                : 'text-gray-700 hover:bg-gray-50'
+            "
           >
             <i :class="['pi', item.icon]"></i>
             <span>{{ item.label }}</span>
