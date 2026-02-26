@@ -21,13 +21,27 @@ const ultimasIngresadas = ref([])
 
 // Fecha actual formateada para el título
 const fechaActual = computed(() => {
-  const f = new Date().toLocaleDateString('es-AR', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-  return f.charAt(0).toUpperCase() + f.slice(1)
+  const ahora = new Date()
+  const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+  const meses = [
+    'enero',
+    'febrero',
+    'marzo',
+    'abril',
+    'mayo',
+    'junio',
+    'julio',
+    'agosto',
+    'septiembre',
+    'octubre',
+    'noviembre',
+    'diciembre',
+  ]
+  const dia = dias[ahora.getDay()]
+  const numero = ahora.getDate()
+  const mes = meses[ahora.getMonth()]
+  const anio = ahora.getFullYear()
+  return `${dia}, ${numero} de ${mes} de ${anio}`
 })
 
 // Colores de estado para Tags (según especificación)
@@ -168,7 +182,7 @@ onMounted(cargarDashboard)
       <!-- Título y fecha -->
       <header class="mb-6">
         <h1 class="text-2xl md:text-3xl font-bold text-[#1e3a5f]">Panel de Control</h1>
-        <p class="text-sm text-gray-500 mt-1 capitalize">{{ fechaActual }}</p>
+        <p class="text-sm text-gray-500 mt-1">{{ fechaActual }}</p>
       </header>
 
       <!-- Mensaje de error global -->
@@ -181,95 +195,107 @@ onMounted(cargarDashboard)
 
       <!-- Tarjetas superiores: grid 4 cols desktop, 2 tablet -->
       <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card
-          v-for="i in 4"
-          v-if="cargando"
-          :key="'sk-' + i"
-          class="!border-l-4 !bg-white !border !border-gray-200 !shadow-sm"
-          style="border-left-color: #2d6a9f"
-        >
-          <template #content>
-            <div class="flex items-center gap-3">
-              <Skeleton shape="circle" size="3rem" />
-              <div class="flex-1">
-                <Skeleton width="8rem" height="1rem" class="mb-2" />
-                <Skeleton width="4rem" height="1.75rem" />
+        <!-- Skeleton mientras carga -->
+        <template v-if="cargando">
+          <Card v-for="i in 4" :key="'sk-' + i" class="!shadow-sm">
+            <template #content>
+              <div class="flex items-center gap-3">
+                <Skeleton shape="circle" size="3rem" />
+                <div class="flex-1">
+                  <Skeleton width="8rem" height="1rem" class="mb-2" />
+                  <Skeleton width="4rem" height="1.75rem" />
+                </div>
               </div>
-            </div>
-          </template>
-        </Card>
+            </template>
+          </Card>
+        </template>
+
+        <!-- Tarjetas reales -->
         <template v-else>
           <!-- 1. Ingresadas hoy -->
-          <Card
-            class="!bg-white !border !border-gray-200 !border-l-4 !shadow-sm"
+          <div
+            class="rounded-lg shadow-sm overflow-hidden border-l-4"
             style="border-left-color: #2d6a9f"
           >
-            <template #content>
-              <div class="flex items-center gap-3">
-                <i class="pi pi-inbox text-2xl" style="color: #2d6a9f" />
-                <div>
-                  <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">
-                    Ingresadas hoy
-                  </p>
-                  <p class="text-2xl font-bold text-gray-900">{{ ingresadasHoy }}</p>
+            <Card class="!shadow-none !border-0 !rounded-none" style="background-color: #f8fafc">
+              <template #content>
+                <div class="flex items-center gap-3">
+                  <i class="pi pi-inbox text-2xl" style="color: #2d6a9f" />
+                  <div>
+                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">
+                      Ingresadas hoy
+                    </p>
+                    <p class="text-2xl font-bold text-gray-900">{{ ingresadasHoy }}</p>
+                  </div>
                 </div>
-              </div>
-            </template>
-          </Card>
+              </template>
+            </Card>
+          </div>
+
           <!-- 2. En proceso -->
-          <Card
-            class="!bg-white !border !border-gray-200 !border-l-4 !shadow-sm"
+          <div
+            class="rounded-lg shadow-sm overflow-hidden border-l-4"
             style="border-left-color: #f59e0b"
           >
-            <template #content>
-              <div class="flex items-center gap-3">
-                <i class="pi pi-spinner pi-spin text-2xl" style="color: #f59e0b" />
-                <div>
-                  <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">
-                    En proceso
-                  </p>
-                  <p class="text-2xl font-bold text-gray-900">{{ enProceso }}</p>
+            <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
+              <template #content>
+                <div class="flex items-center gap-3">
+                  <i class="pi pi-spinner pi-spin text-2xl" style="color: #f59e0b" />
+                  <div>
+                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">
+                      En proceso
+                    </p>
+                    <p class="text-2xl font-bold text-gray-900">{{ enProceso }}</p>
+                  </div>
                 </div>
-              </div>
-            </template>
-          </Card>
+              </template>
+            </Card>
+          </div>
+
           <!-- 3. Atrasadas -->
-          <Card
-            class="!bg-white !border !border-gray-200 !border-l-4 !shadow-sm"
+          <div
+            class="rounded-lg shadow-sm overflow-hidden border-l-4"
             style="border-left-color: #e74c3c"
           >
-            <template #content>
-              <div class="flex items-center gap-3">
-                <i class="pi pi-exclamation-triangle text-2xl" style="color: #e74c3c" />
-                <div>
-                  <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">Atrasadas</p>
-                  <p
-                    class="text-2xl font-bold"
-                    :class="atrasadas > 0 ? 'text-[#e74c3c]' : 'text-gray-900'"
-                  >
-                    {{ atrasadas }}
-                  </p>
+            <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
+              <template #content>
+                <div class="flex items-center gap-3">
+                  <i class="pi pi-exclamation-triangle text-2xl" style="color: #e74c3c" />
+                  <div>
+                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">
+                      Atrasadas
+                    </p>
+                    <p
+                      class="text-2xl font-bold"
+                      :class="atrasadas > 0 ? 'text-[#e74c3c]' : 'text-gray-900'"
+                    >
+                      {{ atrasadas }}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </template>
-          </Card>
+              </template>
+            </Card>
+          </div>
+
           <!-- 4. Resueltas este mes -->
-          <Card
-            class="!bg-white !border !border-gray-200 !border-l-4 !shadow-sm"
+          <div
+            class="rounded-lg shadow-sm overflow-hidden border-l-4"
             style="border-left-color: #27ae60"
           >
-            <template #content>
-              <div class="flex items-center gap-3">
-                <i class="pi pi-check-circle text-2xl" style="color: #27ae60" />
-                <div>
-                  <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">
-                    Resueltas este mes
-                  </p>
-                  <p class="text-2xl font-bold text-gray-900">{{ resueltasEsteMes }}</p>
+            <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
+              <template #content>
+                <div class="flex items-center gap-3">
+                  <i class="pi pi-check-circle text-2xl" style="color: #27ae60" />
+                  <div>
+                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">
+                      Resueltas este mes
+                    </p>
+                    <p class="text-2xl font-bold text-gray-900">{{ resueltasEsteMes }}</p>
+                  </div>
                 </div>
-              </div>
-            </template>
-          </Card>
+              </template>
+            </Card>
+          </div>
         </template>
       </section>
 
