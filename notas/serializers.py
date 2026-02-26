@@ -1,6 +1,13 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import Nota, HistorialNota, Adjunto, EstadoChoices
+from .models import Nota, HistorialNota, Adjunto, Sector, EstadoChoices
+
+
+class SectorSerializer(serializers.ModelSerializer):
+    """Serializer para listado de sectores (dropdown)."""
+    class Meta:
+        model = Sector
+        fields = ['id', 'nombre', 'numero']
 
 
 class NotaListSerializer(serializers.ModelSerializer):
@@ -170,7 +177,7 @@ class HistorialNotaSerializer(serializers.ModelSerializer):
 
 class AdjuntoSerializer(serializers.ModelSerializer):
     """Serializer para adjuntos de notas."""
-    nota = serializers.StringRelatedField(read_only=True)
+    nota = serializers.PrimaryKeyRelatedField(queryset=Nota.objects.all(), required=True)
     subido_por = serializers.StringRelatedField(read_only=True)
     archivo = serializers.FileField(write_only=True, required=False)
     tamaño_formateado = serializers.SerializerMethodField()
@@ -201,3 +208,17 @@ class AdjuntoSerializer(serializers.ModelSerializer):
     def get_tamaño_formateado(self, obj):
         """Retorna el tamaño formateado del archivo."""
         return obj.tamaño_formateado()
+
+    def create(self, validated_data):
+        """Rellena ruta_almacenamiento, tipo_mime y tamaño_bytes desde el archivo si existe."""
+        archivo = validated_data.pop('archivo', None)
+        nombre = validated_data.get('nombre_archivo', '') or 'sin_nombre'
+        validated_data['ruta_almacenamiento'] = nombre[:500]
+        validated_data['tipo_mime'] = 'application/octet-stream'
+        validated_data['tamaño_bytes'] = 0
+        if archivo:
+            validated_data['tamaño_bytes'] = getattr(archivo, 'size', 0) or 0
+            ct = getattr(archivo, 'content_type', None)
+            if ct:
+                validated_data['tipo_mime'] = ct[:100]
+        return super().create(validated_data)

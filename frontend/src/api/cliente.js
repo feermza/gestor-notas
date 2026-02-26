@@ -100,6 +100,31 @@ export async function post(url, data) {
 }
 
 /**
+ * POST con FormData (multipart). Para subida de archivos.
+ * No envía Content-Type para que el navegador establezca el boundary.
+ * @param {string} url
+ * @param {FormData} formData
+ * @returns {Promise<object>} JSON
+ */
+export async function postFormData(url, formData) {
+  const fullUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`
+  const method = 'POST'
+  const headers = {}
+  const csrf = getCsrfToken()
+  if (csrf) headers['X-CSRFToken'] = csrf
+  const response = await fetch(fullUrl, {
+    method,
+    credentials: 'include',
+    headers,
+    body: formData,
+  })
+  if (response.headers.get('content-type')?.includes('application/json')) {
+    return parseJson(response)
+  }
+  return response
+}
+
+/**
  * PATCH
  * @param {string} url
  * @param {object} data - Cuerpo JSON

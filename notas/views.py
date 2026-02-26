@@ -15,13 +15,14 @@ from usuarios.permissions import (
     PuedeAnularNota,
 )
 
-from .models import Nota, HistorialNota, Adjunto, EstadoChoices, TipoEventoChoices
+from .models import Nota, HistorialNota, Adjunto, Sector, EstadoChoices, TipoEventoChoices
 from .serializers import (
     NotaListSerializer,
     NotaDetalleSerializer,
     NotaCambioEstadoSerializer,
     HistorialNotaSerializer,
-    AdjuntoSerializer
+    AdjuntoSerializer,
+    SectorSerializer,
 )
 from .utils import (
     es_transicion_permitida,
@@ -363,6 +364,22 @@ class NotaViewSet(viewsets.ModelViewSet):
         serializer = NotaListSerializer(queryset, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'], url_path='adjuntos')
+    def adjuntos(self, request, pk=None):
+        """
+        Crea un adjunto para la nota (POST multipart con archivo).
+        URL: POST /api/notas/{id}/adjuntos/
+        """
+        nota = self.get_object()
+        data = request.data.copy()
+        data['nota'] = nota.pk
+        serializer = AdjuntoSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(
+            subido_por=request.user if request.user.is_authenticated else None
+        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
 
 class HistorialNotaViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -419,3 +436,13 @@ class AdjuntoViewSet(viewsets.ModelViewSet):
         serializer.save(
             subido_por=self.request.user if self.request.user.is_authenticated else None
         )
+
+
+class SectorViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet de solo lectura para sectores.
+    list: devuelve todos los sectores activos ordenados por nombre.
+    """
+    queryset = Sector.objects.filter(activo=True).order_by('nombre')
+    serializer_class = SectorSerializer
+    permission_classes = [EstaAutenticado]

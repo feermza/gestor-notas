@@ -48,7 +48,7 @@ const router = createRouter({
         {
           path: 'notas/nueva',
           name: 'notas-nueva',
-          component: () => import('@/views/DashboardView.vue'),
+          component: () => import('@/views/NuevaNotaView.vue'),
         },
         {
           path: 'notas/pendientes',
