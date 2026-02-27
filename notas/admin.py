@@ -44,8 +44,7 @@ class NotaAdmin(admin.ModelAdmin):
     """Administración del modelo Nota."""
     
     list_display = [
-        'numero_nota_interno',
-        'numero_nota_externo',
+        'numero_nota',
         'tema',
         'estado',
         'prioridad',
@@ -54,7 +53,7 @@ class NotaAdmin(admin.ModelAdmin):
         'fecha_ingreso',
         'get_area_origen_display',
     ]
-    list_display_links = ['numero_nota_interno', 'tema']
+    list_display_links = ['numero_nota', 'tema']
     
     list_editable = ['estado', 'responsable']
     
@@ -69,19 +68,19 @@ class NotaAdmin(admin.ModelAdmin):
     ]
     
     search_fields = [
-        'numero_nota_interno',
-        'numero_nota_externo',
+        'numero_nota',
         'tema',
         'remitente',
         'descripcion',
         'area_origen',
+        'tarea_asignada',
     ]
     
     ordering = ['-fecha_ingreso']
     
     fieldsets = (
         ('Numeración', {
-            'fields': ('numero_nota_interno', 'numero_nota_externo')
+            'fields': ('numero_nota', 'tiene_numero_formal')
         }),
         ('Información Básica', {
             'fields': ('fecha_ingreso', 'fecha_limite')
@@ -89,10 +88,11 @@ class NotaAdmin(admin.ModelAdmin):
         ('Origen y Contenido', {
             'fields': (
                 'remitente',
-                'emisor_sector',
+                'sector_origen',
                 'emisor_externo',
                 'area_origen',
                 'tema',
+                'tarea_asignada',
                 'descripcion',
             )
         }),
@@ -114,13 +114,13 @@ class NotaAdmin(admin.ModelAdmin):
     )
     
     readonly_fields = [
-        'numero_nota_interno',
+        'numero_nota',
         'fecha_creacion',
         'ultima_modificacion',
         'creado_por',
     ]
     
-    autocomplete_fields = ['emisor_sector', 'responsable', 'creado_por']
+    autocomplete_fields = ['sector_origen', 'responsable', 'creado_por']
     inlines = [NotaAgenteInline]
     
     def get_area_origen_display(self, obj):
@@ -134,7 +134,7 @@ class NotaAdmin(admin.ModelAdmin):
         return qs.select_related(
             'responsable',
             'creado_por',
-            'emisor_sector',
+            'sector_origen',
         )
 
 
@@ -155,10 +155,9 @@ class HistorialNotaAdmin(admin.ModelAdmin):
     list_filter = ['tipo_evento', 'fecha_hora', 'estado_anterior', 'estado_nuevo']
     
     search_fields = [
-        'nota__numero_nota_interno',
-        'nota__numero_nota_externo',
+        'nota__numero_nota',
         'nota__tema',
-        'usuario__username',
+        'usuario__legajo',
         'usuario__email',
     ]
     
@@ -228,11 +227,10 @@ class AdjuntoAdmin(admin.ModelAdmin):
     list_filter = ['fecha_subida', 'tipo_mime', 'tipo_adjunto']
     
     search_fields = [
-        'nota__numero_nota_interno',
-        'nota__numero_nota_externo',
+        'nota__numero_nota',
         'nota__tema',
         'nombre_archivo',
-        'subido_por__username',
+        'subido_por__legajo',
     ]
     
     ordering = ['-fecha_subida']
@@ -276,7 +274,7 @@ class DistribucionResolucionAdmin(admin.ModelAdmin):
     """Administración del modelo DistribucionResolucion."""
     list_display = ['nota', 'sector_destino', 'medio', 'fecha_envio', 'enviado_por']
     list_filter = ['medio', 'fecha_envio']
-    search_fields = ['nota__numero_nota_interno', 'sector_destino__nombre']
+    search_fields = ['nota__numero_nota', 'sector_destino__nombre']
     autocomplete_fields = ['nota', 'sector_destino', 'enviado_por']
     readonly_fields = ['fecha_envio']
     ordering = ['-fecha_envio']

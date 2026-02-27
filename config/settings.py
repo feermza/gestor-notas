@@ -146,6 +146,12 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Modelo de usuario personalizado
 AUTH_USER_MODEL = 'usuarios.Usuario'
 
+# Backends de autenticación (permite login con legajo)
+AUTHENTICATION_BACKENDS = [
+    'usuarios.backends.LegajoBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 # Control de sesiones
 SESSION_COOKIE_AGE = 28800  # 8 horas (en segundos)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True

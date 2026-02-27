@@ -12,15 +12,14 @@ class SectorSerializer(serializers.ModelSerializer):
 
 class NotaListSerializer(serializers.ModelSerializer):
     """Serializer para listado de notas con campos esenciales."""
-    responsable = serializers.StringRelatedField(read_only=True)
+    responsable = serializers.SerializerMethodField()
     atrasada = serializers.SerializerMethodField()
     
     class Meta:
         model = Nota
         fields = [
             'id',
-            'numero_nota_interno',
-            'numero_nota_externo',
+            'numero_nota',
             'tema',
             'estado',
             'prioridad',
@@ -29,6 +28,12 @@ class NotaListSerializer(serializers.ModelSerializer):
             'fecha_ingreso',
             'atrasada'
         ]
+    
+    def get_responsable(self, obj):
+        """Retorna el nombre completo del responsable."""
+        if obj.responsable:
+            return obj.responsable.nombre_completo
+        return None
     
     def get_atrasada(self, obj):
         """Calcula si la nota está atrasada."""
@@ -42,30 +47,35 @@ class NotaListSerializer(serializers.ModelSerializer):
 
 class NotaDetalleSerializer(serializers.ModelSerializer):
     """Serializer para detalle completo de una nota."""
-    responsable = serializers.StringRelatedField(read_only=True)
-    creado_por = serializers.StringRelatedField(read_only=True)
+    responsable = serializers.SerializerMethodField()
+    creado_por = serializers.SerializerMethodField()
     historial = serializers.SerializerMethodField()
     adjuntos = serializers.SerializerMethodField()
     atrasada = serializers.SerializerMethodField()
+    sector_origen_id = serializers.IntegerField(write_only=True, required=False, allow_null=True, source='sector_origen')
+    responsable_id = serializers.IntegerField(write_only=True, required=False, allow_null=True, source='responsable')
     
     class Meta:
         model = Nota
         fields = [
             'id',
-            'numero_nota_interno',
-            'numero_nota_externo',
+            'numero_nota',
+            'tiene_numero_formal',
             'fecha_ingreso',
             'fecha_limite',
             'remitente',
-            'emisor_sector',
+            'sector_origen',
+            'sector_origen_id',
             'emisor_externo',
             'area_origen',
             'tema',
+            'tarea_asignada',
             'descripcion',
             'prioridad',
             'estado',
             'canal_ingreso',
             'responsable',
+            'responsable_id',
             'creado_por',
             'fecha_creacion',
             'ultima_modificacion',
@@ -79,11 +89,24 @@ class NotaDetalleSerializer(serializers.ModelSerializer):
             'atrasada'
         ]
         read_only_fields = [
-            'numero_nota_interno',
+            'numero_nota',
             'fecha_creacion',
             'ultima_modificacion',
             'creado_por'
         ]
+    
+    def get_responsable(self, obj):
+        """Retorna el nombre completo del responsable."""
+        if obj.responsable:
+            return obj.responsable.nombre_completo
+        return None
+    
+    def get_creado_por(self, obj):
+        """Retorna el nombre completo del usuario que creó la nota."""
+        if obj.creado_por:
+            return obj.creado_por.nombre_completo
+        return None
+    
     
     def get_historial(self, obj):
         """Retorna el historial de la nota."""

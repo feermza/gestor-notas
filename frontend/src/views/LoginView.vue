@@ -7,7 +7,7 @@ import { get } from '@/api/cliente'
 const router = useRouter()
 const auth = useAuthStore()
 
-const username = ref('')
+const legajo = ref('')
 const password = ref('')
 const enviando = ref(false)
 
@@ -18,11 +18,11 @@ onMounted(() => {
 const mensajeError = computed(() => auth.error)
 
 async function enviar() {
-  if (!username.value.trim() || !password.value) return
+  if (!legajo.value.trim() || !password.value) return
   enviando.value = true
   auth.error = null
   try {
-    await auth.login(username.value.trim(), password.value)
+    await auth.login(legajo.value.trim(), password.value)
     router.push('/')
   } catch {
     // Error ya guardado en auth.error
@@ -49,13 +49,13 @@ async function enviar() {
 
           <form class="login-form" @submit.prevent="enviar">
             <div class="login-field">
-              <label for="username" class="login-label">Usuario</label>
+              <label for="legajo" class="login-label">Legajo</label>
               <InputText
-                id="username"
-                v-model="username"
+                id="legajo"
+                v-model="legajo"
                 type="text"
                 class="w-full login-input"
-                placeholder="Nombre de usuario"
+                placeholder="Ingrese su número de legajo"
                 autocomplete="username"
                 :disabled="enviando"
               />
@@ -85,7 +85,7 @@ async function enviar() {
               icon-pos="right"
               class="login-btn w-full justify-center"
               :loading="enviando"
-              :disabled="!username.trim() || !password"
+              :disabled="!legajo.trim() || !password"
             />
           </form>
         </div>

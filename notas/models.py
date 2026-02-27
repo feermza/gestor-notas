@@ -119,25 +119,23 @@ class Nota(models.Model):
     """
     Modelo principal que representa una nota ingresada al sistema.
     Una nota nunca se borra físicamente, solo se anula con motivo.
-    numero_nota_interno se genera siempre automáticamente.
+    numero_nota se genera automáticamente si tiene_numero_formal=False.
     """
-    numero_nota_externo = models.CharField(
-        max_length=50,
-        null=True,
-        blank=True,
-        verbose_name='Número de Nota (externo)',
-        help_text='Número asignado por el remitente u otro sistema'
-    )
-    numero_nota_interno = models.CharField(
+    numero_nota = models.CharField(
         max_length=30,
         unique=True,
         blank=True,
-        verbose_name='Número de Nota (interno)',
-        help_text='Generado: {sector.numero}-{secuencia}-{año} o INT-{secuencia}-{año}'
+        verbose_name='Número de Nota',
+        help_text='Número completo de la nota: {sector.numero}-{numero}-{año} o {sector.numero}-I{secuencia}-{año}'
     )
-    fecha_ingreso = models.DateField(
+    tiene_numero_formal = models.BooleanField(
+        default=False,
+        verbose_name='Tiene Número Formal',
+        help_text='True si el número lo trajo la nota física (formato completo desde formulario)'
+    )
+    fecha_ingreso = models.DateTimeField(
         verbose_name='Fecha de Ingreso',
-        help_text='Fecha en que la nota ingresó al sistema'
+        help_text='Fecha y hora en que la nota ingresó al sistema'
     )
     fecha_limite = models.DateField(
         null=True,
@@ -150,14 +148,14 @@ class Nota(models.Model):
         verbose_name='Remitente',
         help_text='Persona o entidad que envía la nota'
     )
-    emisor_sector = models.ForeignKey(
+    sector_origen = models.ForeignKey(
         Sector,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='notas_emitidas',
-        verbose_name='Emisor (sector)',
-        help_text='Sector interno que emite la nota'
+        related_name='notas_origen',
+        verbose_name='Sector de Origen',
+        help_text='Sector interno de origen de la nota'
     )
     emisor_externo = models.CharField(
         max_length=200,
@@ -172,11 +170,18 @@ class Nota(models.Model):
         help_text='Área o departamento de origen de la nota'
     )
     tema = models.CharField(
-        max_length=200,
+        max_length=100,
         verbose_name='Tema',
-        help_text='Tema o asunto principal de la nota'
+        help_text='Tema o asunto principal de la nota (máximo 100 caracteres)'
+    )
+    tarea_asignada = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name='Tarea Asignada',
+        help_text='Acción concreta que debe ejecutar el responsable'
     )
     descripcion = models.TextField(
+        blank=True,
         verbose_name='Descripción',
         help_text='Descripción detallada del contenido de la nota'
     )
@@ -267,44 +272,75 @@ class Nota(models.Model):
             models.Index(fields=['estado']),
             models.Index(fields=['responsable']),
             models.Index(fields=['fecha_ingreso']),
-            models.Index(fields=['numero_nota_interno']),
+            models.Index(fields=['numero_nota']),
         ]
 
     def __str__(self):
-        return f"{self.numero_nota_interno or '(sin número)'} - {self.tema}"
+        return f"{self.numero_nota or '(sin número)'} - {self.tema}"
 
     def save(self, *args, **kwargs):
-        """Genera numero_nota_interno si está vacío (numeración atómica)."""
-        if not self.numero_nota_interno:
-            self.numero_nota_interno = self._generar_numero_interno()
+        """
+        Genera numero_nota automáticamente si tiene_numero_formal=False.
+        Usa select_for_update() para evitar duplicados en concurrencia.
+        """
+        if not self.numero_nota:
+            if self.tiene_numero_formal:
+                # Si tiene número formal, debe venir completo desde el formulario
+                # No generamos nada aquí, se espera que venga en el payload
+                pass
+            else:
+                # Generar número interno automáticamente
+                self.numero_nota = self._generar_numero_interno()
         super().save(*args, **kwargs)
 
     def _generar_numero_interno(self):
         """
-        Genera número interno: {sector.numero}-{secuencia}-{año} o INT-{secuencia}-{año}.
-        Usa select_for_update() para evitar duplicados en concurrencia.
+        Genera número interno automáticamente según las reglas:
+        - Si tiene sector_origen: {sector.numero}-I{contador+1:03d}-{año}
+        - Si NO tiene sector_origen: asignar Mesa de Entradas automáticamente
+        - Usa select_for_update() para evitar duplicados en concurrencia.
         """
         from django.db import transaction
+        
         año = timezone.now().year
-        if self.emisor_sector_id:
-            sector = Sector.objects.get(pk=self.emisor_sector_id)
+        sector = self.sector_origen
+        
+        # Si no tiene sector_origen, asignar Mesa de Entradas automáticamente
+        if not sector:
+            try:
+                sector = Sector.objects.get(nombre__icontains='Mesa de Entradas', activo=True)
+                self.sector_origen = sector
+            except Sector.DoesNotExist:
+                # Si no existe Mesa de Entradas, usar INT
+                prefix = 'INT'
+                sector = None
+        
+        if sector:
             prefix = str(sector.numero)
         else:
             prefix = 'INT'
+        
         with transaction.atomic():
+            # Buscar última nota del mismo sector/año con formato interno
             last = Nota.objects.filter(
-                numero_nota_interno__startswith=f"{prefix}-",
-                numero_nota_interno__endswith=f"-{año}"
-            ).select_for_update().order_by('-numero_nota_interno').first()
+                numero_nota__startswith=f"{prefix}-I",
+                numero_nota__endswith=f"-{año}"
+            ).select_for_update().order_by('-numero_nota').first()
+            
             if last:
-                parts = last.numero_nota_interno.split('-')
-                if len(parts) == 3:
-                    seq = int(parts[1]) + 1
+                # Extraer secuencia del formato {prefix}-I{seq:03d}-{año}
+                parts = last.numero_nota.split('-')
+                if len(parts) == 3 and parts[1].startswith('I'):
+                    try:
+                        seq = int(parts[1][1:]) + 1
+                    except ValueError:
+                        seq = 1
                 else:
                     seq = 1
             else:
                 seq = 1
-        return f"{prefix}-{seq:04d}-{año}"
+        
+        return f"{prefix}-I{seq:03d}-{año}"
 
     def esta_atrasada(self):
         """Verifica si la nota está atrasada respecto a su fecha límite."""
@@ -339,7 +375,7 @@ class NotaAgente(models.Model):
         unique_together = [['nota', 'agente']]
 
     def __str__(self):
-        return f"{self.nota.numero_nota_interno} - {self.agente}"
+        return f"{self.nota.numero_nota} - {self.agente}"
 
 
 # --- Historial (inmutable) ---
@@ -426,7 +462,7 @@ class HistorialNota(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.nota.numero_nota_interno} - {self.get_tipo_evento_display()} - {self.fecha_hora}"
+        return f"{self.nota.numero_nota} - {self.get_tipo_evento_display()} - {self.fecha_hora}"
 
 
 # --- Adjuntos ---
@@ -495,7 +531,7 @@ class Adjunto(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.nota.numero_nota_interno} - {self.nombre_archivo}"
+        return f"{self.nota.numero_nota} - {self.nombre_archivo}"
 
     def tamaño_formateado(self):
         """Retorna el tamaño del archivo formateado en KB o MB."""
@@ -612,4 +648,4 @@ class DistribucionResolucion(models.Model):
         ordering = ['-fecha_envio']
 
     def __str__(self):
-        return f"{self.nota.numero_nota_interno} → {self.sector_destino}"
+        return f"{self.nota.numero_nota} → {self.sector_destino}"

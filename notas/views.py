@@ -117,14 +117,31 @@ class NotaViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         """
         Crea una nueva nota.
-        - numero_nota_interno se genera en Nota.save()
+        - numero_nota se genera en Nota.save() si tiene_numero_formal=False
         - Estado inicial siempre INGRESADA
         - Asigna el usuario actual como creado_por
+        - Maneja sector_origen_id y responsable_id desde el payload
         """
-        serializer = self.get_serializer(data=request.data)
+        data = request.data.copy()
+        
+        # Mapear sector_origen_id si viene en el payload
+        if 'sector_origen_id' in data:
+            data['sector_origen'] = data.pop('sector_origen_id')
+        
+        serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         
-        # Crear la nota (numero_nota_interno se genera en save())
+        # Si viene numero_nota_externo, construir el número completo
+        numero_externo = data.get('numero_nota_externo')
+        if numero_externo and serializer.validated_data.get('sector_origen'):
+            from .models import Sector
+            sector = serializer.validated_data['sector_origen']
+            año = timezone.now().year
+            numero_completo = f"{sector.numero}-{numero_externo}-{año}"
+            serializer.validated_data['tiene_numero_formal'] = True
+            serializer.validated_data['numero_nota'] = numero_completo
+        
+        # Crear la nota (numero_nota se genera en save() si no tiene número formal)
         nota = serializer.save(
             estado=EstadoChoices.INGRESADA,
             creado_por=request.user if request.user.is_authenticated else None
