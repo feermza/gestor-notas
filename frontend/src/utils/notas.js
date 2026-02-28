@@ -78,17 +78,15 @@ export function formatoFechaHora(fechaStr) {
 /** "hace X minutos", "hace 2 horas", "ayer", "hace 3 días" */
 export function haceCuanto(fechaStr) {
   if (!fechaStr) return '—'
-  const fecha = new Date(fechaStr + 'T12:00:00')
+  const fecha = new Date(fechaStr)
   const ahora = new Date()
   const diffMs = ahora - fecha
   const diffDias = Math.floor(diffMs / (24 * 60 * 60 * 1000))
   const diffHoras = Math.floor(diffMs / (60 * 60 * 1000))
   const diffMin = Math.floor(diffMs / (60 * 1000))
 
-  if (diffMin < 60)
-    return diffMin <= 1 ? 'hace un momento' : `hace ${diffMin} minutos`
-  if (diffHoras < 24)
-    return diffHoras === 1 ? 'hace 1 hora' : `hace ${diffHoras} horas`
+  if (diffMin < 60) return diffMin <= 1 ? 'hace un momento' : `hace ${diffMin} minutos`
+  if (diffHoras < 24) return diffHoras === 1 ? 'hace 1 hora' : `hace ${diffHoras} horas`
   if (diffDias === 1) return 'ayer'
   if (diffDias < 7) return `hace ${diffDias} días`
   return formatoFecha(fechaStr)
