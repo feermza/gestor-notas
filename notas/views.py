@@ -6,6 +6,8 @@ from django.db.models import Q
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 
+
+
 from usuarios.permissions import (
     EstaAutenticado,
     EsDirectorJefeOAdmin,
@@ -23,6 +25,7 @@ from .serializers import (
     HistorialNotaSerializer,
     AdjuntoSerializer,
     SectorSerializer,
+    NotaCreateSerializer,
 )
 from .utils import (
     es_transicion_permitida,
@@ -43,6 +46,8 @@ class NotaViewSet(viewsets.ModelViewSet):
     - pendientes: Lista notas pendientes del usuario actual (acción custom)
     - atrasadas: Lista notas atrasadas (acción custom)
     """
+    serializer_class = NotaCreateSerializer
+
     queryset = Nota.objects.all()
 
     def get_permissions(self):
@@ -63,12 +68,10 @@ class NotaViewSet(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         """Retorna el serializer apropiado según la acción."""
-        if self.action == 'list':
+        if self.action == 'create':
+            return NotaCreateSerializer
+        elif self.action == 'list':
             return NotaListSerializer
-        elif self.action == 'retrieve':
-            return NotaDetalleSerializer
-        elif self.action == 'cambiar_estado':
-            return NotaCambioEstadoSerializer
         return NotaDetalleSerializer
     
     def get_queryset(self):
@@ -117,37 +120,14 @@ class NotaViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         """
         Crea una nueva nota.
-        - numero_nota se genera en Nota.save() si tiene_numero_formal=False
-        - Estado inicial siempre INGRESADA
-        - Asigna el usuario actual como creado_por
-        - Maneja sector_origen_id y responsable_id desde el payload
+        No se modifica request.data; el serializer recibe el payload tal cual.
+        numero_nota se genera en Nota.save() si no tiene número formal.
+        Estado inicial INGRESADA; se crea registro en historial.
         """
-        data = request.data.copy()
-        
-        # Mapear sector_origen_id si viene en el payload
-        if 'sector_origen_id' in data:
-            data['sector_origen'] = data.pop('sector_origen_id')
-        
-        serializer = self.get_serializer(data=data)
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
-        # Si viene numero_nota_externo, construir el número completo
-        numero_externo = data.get('numero_nota_externo')
-        if numero_externo and serializer.validated_data.get('sector_origen'):
-            from .models import Sector
-            sector = serializer.validated_data['sector_origen']
-            año = timezone.now().year
-            numero_completo = f"{sector.numero}-{numero_externo}-{año}"
-            serializer.validated_data['tiene_numero_formal'] = True
-            serializer.validated_data['numero_nota'] = numero_completo
-        
-        # Crear la nota (numero_nota se genera en save() si no tiene número formal)
-        nota = serializer.save(
-            estado=EstadoChoices.INGRESADA,
-            creado_por=request.user if request.user.is_authenticated else None
-        )
-        
-        # Crear registro inicial en el historial
+        nota = serializer.save()
+
         if request.user.is_authenticated:
             crear_registro_historial(
                 nota=nota,
@@ -156,7 +136,7 @@ class NotaViewSet(viewsets.ModelViewSet):
                 estado_nuevo=EstadoChoices.INGRESADA,
                 descripcion_cambio='Nota creada en el sistema'
             )
-        
+
         headers = self.get_success_headers(serializer.data)
         return Response(
             NotaDetalleSerializer(nota).data,

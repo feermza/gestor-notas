@@ -62,6 +62,19 @@ export function formatoFecha(fechaStr) {
   })
 }
 
+/** Formato fecha y hora (dd/mm/yyyy HH:MM) */
+export function formatoFechaHora(fechaStr) {
+  if (!fechaStr) return '—'
+  const d = new Date(fechaStr)
+  return d.toLocaleString('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 /** "hace X minutos", "hace 2 horas", "ayer", "hace 3 días" */
 export function haceCuanto(fechaStr) {
   if (!fechaStr) return '—'

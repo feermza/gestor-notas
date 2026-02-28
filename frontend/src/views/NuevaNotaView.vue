@@ -19,13 +19,16 @@ const enviando = ref(false)
 const errorGeneral = ref(null)
 
 const form = ref({
-  sector_origen: null,
+  sector_origen_id: null,
   numero_nota_externo: '',
   tema: '',
   tarea_asignada: '',
   responsable_id: null,
   prioridad: 'MEDIA', // API usa MEDIA, se muestra como "Normal"
 })
+
+// Alias para usar en el template con el nombre solicitado
+const formulario = form
 
 const errores = ref({})
 
@@ -42,8 +45,8 @@ const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png']
 const fechaIngreso = ref(new Date())
 const anioActual = fechaIngreso.value.getFullYear()
 
-// Opciones sector para dropdown (ordenado por número)
-const opcionesSector = computed(() =>
+// Sectores formateados para dropdown (ordenado por número)
+const sectoresFormateados = computed(() =>
   [...sectores.value]
     .slice()
     .sort((a, b) => {
@@ -52,24 +55,25 @@ const opcionesSector = computed(() =>
       return aNum - bNum
     })
     .map((s) => ({
-      value: s.id,
-      label: `${s.numero} — ${s.nombre}`,
-      numero: s.numero,
+      ...s,
+      nombre_completo: `${s.numero} — ${s.nombre}`,
     }))
 )
 
 const sectorSeleccionado = computed(() => {
-  const id = form.value.sector_origen
+  const id = form.value.sector_origen_id
   return sectores.value.find((s) => s.id === id) || null
 })
 
-// Opciones de responsables (excluye SOLO_LECTURA)
-const opcionesResponsable = computed(() =>
+// Usuarios formateados para dropdown de responsable (excluye CONSULTOR)
+const usuariosFormateados = computed(() =>
   usuarios.value
-    .filter((u) => u.rol !== 'SOLO_LECTURA')
+    .filter((u) => u.rol !== 'CONSULTOR')
     .map((u) => ({
-      value: u.id,
-      label: `${u.nombre_completo} (${u.rol_display})`,
+      ...u,
+      nombre_completo:
+        u.nombre_completo ||
+        `${u.apellido || ''}, ${u.nombres || ''} (${u.rol || ''})`.trim(),
     }))
 )
 
@@ -85,18 +89,6 @@ const opcionesPrioridad = computed(() =>
 // Contadores
 const temaLength = computed(() => (form.value.tema || '').length)
 const tareaLength = computed(() => (form.value.tarea_asignada || '').length)
-
-// Habilitar botón Guardar cuando obligatorios básicos están completos
-const puedeGuardar = computed(() => {
-  const tema = (form.value.tema || '').trim()
-  const tarea = (form.value.tarea_asignada || '').trim()
-  return (
-    !!form.value.sector_origen &&
-    tema.length >= 5 &&
-    tarea.length >= 10 &&
-    !!form.value.responsable_id
-  )
-})
 
 // Preview de numeración visual
 const numeroNotaPreview = computed(() => {
@@ -129,7 +121,7 @@ function limpiarErrores() {
 function validar() {
   const e = {}
 
-  if (!form.value.sector_origen) {
+  if (!form.value.sector_origen_id) {
     e.sector_origen = 'Debe seleccionar un sector de origen'
   }
 
@@ -231,7 +223,7 @@ async function guardar() {
     const numeroExterno = (form.value.numero_nota_externo || '').trim() || null
 
     const payload = {
-      sector_origen_id: form.value.sector_origen,
+      sector_origen_id: form.value.sector_origen_id,
       numero_nota_externo: numeroExterno,
       fecha_ingreso: fechaIngresoIso.value,
       tema,
@@ -317,10 +309,10 @@ onMounted(() => {
                   Sector de origen <span class="text-red-500">*</span>
                 </label>
                 <Dropdown
-                  v-model="form.sector_origen"
-                  :options="opcionesSector"
-                  option-label="label"
-                  option-value="value"
+                  v-model="formulario.sector_origen_id"
+                  :options="sectoresFormateados"
+                  option-label="nombre_completo"
+                  option-value="id"
                   placeholder="Seleccionar sector de origen"
                   class="w-full"
                   :loading="cargandoSectores"
@@ -376,7 +368,7 @@ onMounted(() => {
                   Tema <span class="text-red-500">*</span>
                 </label>
                 <InputText
-                  v-model="form.tema"
+                  v-model="formulario.tema"
                   class="w-full"
                   :maxlength="MAX_TEMA"
                   placeholder="Resumen breve del asunto de la nota"
@@ -398,7 +390,7 @@ onMounted(() => {
                   Tarea a ejecutar <span class="text-red-500">*</span>
                 </label>
                 <InputText
-                  v-model="form.tarea_asignada"
+                  v-model="formulario.tarea_asignada"
                   class="w-full"
                   :maxlength="MAX_TAREA"
                   placeholder="Describí la acción concreta que debe realizar el responsable"
@@ -423,10 +415,10 @@ onMounted(() => {
                   Responsable <span class="text-red-500">*</span>
                 </label>
                 <Dropdown
-                  v-model="form.responsable_id"
-                  :options="opcionesResponsable"
-                  option-label="label"
-                  option-value="value"
+                  v-model="formulario.responsable_id"
+                  :options="usuariosFormateados"
+                  option-label="nombre_completo"
+                  option-value="id"
                   placeholder="Seleccionar responsable"
                   class="w-full"
                   :loading="cargandoUsuarios"
@@ -525,7 +517,11 @@ onMounted(() => {
         </Card>
 
         <!-- Botones finales -->
-        <div class="flex flex-wrap gap-3 justify-end pt-2">
+        <div class="flex flex-col items-end gap-2 pt-2">
+          <p class="text-xs text-gray-400">
+            Debug: sector={{ formulario.sector_origen_id }}, responsable={{ formulario.responsable_id }}
+          </p>
+          <div class="flex flex-wrap gap-3 justify-end w-full">
           <button
             type="button"
             class="px-4 py-2 rounded-lg border border-gray-300 text-gray-600 bg-white hover:bg-gray-50 transition-colors text-sm font-medium"
@@ -538,7 +534,15 @@ onMounted(() => {
             label="Guardar nota"
             icon="pi pi-save"
             :loading="enviando"
-            :disabled="!puedeGuardar || enviando"
+            :disabled="
+              !formulario.sector_origen_id ||
+              !formulario.tema ||
+              formulario.tema.length < 5 ||
+              !formulario.tarea_asignada ||
+              formulario.tarea_asignada.length < 10 ||
+              !formulario.responsable_id ||
+              enviando
+            "
             class="text-sm font-medium"
             style="
               background-color: #1e3a5f !important;
@@ -546,6 +550,7 @@ onMounted(() => {
               color: white !important;
             "
           />
+          </div>
         </div>
       </form>
     </div>

@@ -44,6 +44,57 @@ class NotaListSerializer(serializers.ModelSerializer):
             return timezone.now().date() > obj.fecha_limite
         return False
 
+class NotaCreateSerializer(serializers.Serializer):
+    """
+    Serializer simple (no ModelSerializer) para crear notas.
+    Campos exactos que envía el frontend.
+    """
+    sector_origen_id = serializers.IntegerField(required=True)
+    responsable_id = serializers.IntegerField(required=True)
+    tema = serializers.CharField(required=True, max_length=100)
+    tarea_asignada = serializers.CharField(required=False, allow_blank=True, max_length=200)
+    prioridad = serializers.CharField(required=False, default='MEDIA')
+    numero_nota_externo = serializers.CharField(required=False, allow_blank=True, default='')
+    tiene_numero_formal = serializers.BooleanField(required=False, default=False)
+    fecha_ingreso = serializers.DateTimeField(required=False)
+
+    def create(self, validated_data):
+        from usuarios.models import Usuario
+
+        sector_origen_id = validated_data['sector_origen_id']
+        responsable_id = validated_data['responsable_id']
+        numero_externo = (validated_data.get('numero_nota_externo') or '').strip()
+        sector = Sector.objects.get(id=sector_origen_id)
+        responsable = Usuario.objects.get(id=responsable_id)
+        request = self.context.get('request')
+
+        # Si hay numero_nota_externo: construir numero_nota y tiene_numero_formal=True
+        # Si no: dejar que Nota.save() genere el número
+        numero_nota = ''
+        tiene_numero_formal = False
+        if numero_externo:
+            año = timezone.now().year
+            numero_nota = f"{sector.numero}-{numero_externo}-{año}"
+            tiene_numero_formal = True
+
+        fecha_ingreso = validated_data.get('fecha_ingreso') or timezone.now()
+
+        nota = Nota.objects.create(
+            sector_origen=sector,
+            responsable=responsable,
+            creado_por=request.user if request and request.user.is_authenticated else None,
+            remitente='',
+            area_origen='',
+            estado=EstadoChoices.INGRESADA,
+            tema=validated_data['tema'],
+            tarea_asignada=validated_data.get('tarea_asignada', '') or '',
+            prioridad=validated_data.get('prioridad', 'MEDIA'),
+            tiene_numero_formal=tiene_numero_formal,
+            fecha_ingreso=fecha_ingreso,
+            numero_nota=numero_nota if numero_nota else '',  # vacío para que save() genere si corresponde
+        )
+        return nota
+
 
 class NotaDetalleSerializer(serializers.ModelSerializer):
     """Serializer para detalle completo de una nota."""
@@ -195,7 +246,9 @@ class HistorialNotaSerializer(serializers.ModelSerializer):
             'descripcion_cambio',
             'campos_modificados'
         ]
-        read_only_fields = '__all__'
+        read_only_fields = ['id', 'nota', 'usuario', 'fecha_hora', 'tipo_evento', 
+                    'estado_anterior', 'estado_nuevo', 'responsable_anterior',
+                    'responsable_nuevo', 'descripcion_cambio', 'campos_modificados']
 
 
 class AdjuntoSerializer(serializers.ModelSerializer):

@@ -39,11 +39,11 @@ const router = createRouter({
           name: 'notas',
           component: () => import('@/views/NotasView.vue'),
         },
-        // Placeholder detalle de nota (por ahora)
+        // Detalle de nota
         {
           path: 'notas/:id',
           name: 'nota-detalle',
-          component: () => import('@/views/DashboardView.vue'),
+          component: () => import('@/views/NotaDetalleView.vue'),
         },
         {
           path: 'notas/nueva',

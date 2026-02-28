@@ -43,7 +43,7 @@ const notasFiltradas = computed(() => {
   if (texto) {
     lista = lista.filter(
       (n) =>
-        (n.numero_nota_interno || '').toLowerCase().includes(texto) ||
+        (n.numero_nota || '').toLowerCase().includes(texto) ||
         (n.tema || '').toLowerCase().includes(texto) ||
         (n.remitente || '').toLowerCase().includes(texto),
     )
@@ -192,14 +192,14 @@ onMounted(cargarNotas)
           current-page-report-template="Mostrando {first} a {last} de {totalRecords} notas"
         >
           <!-- Columna Número (clickeable) -->
-          <Column field="numero_nota_interno" header="Número" sortable>
+          <Column field="numero_nota" header="Número" sortable>
             <template #body="{ data }">
               <button
                 type="button"
                 class="font-mono text-sm text-[#1e3a5f] hover:underline cursor-pointer bg-transparent border-none p-0"
                 @click="irADetalle(data.id)"
               >
-                {{ data.numero_nota_interno || '—' }}
+                {{ data.numero_nota || '—' }}
               </button>
             </template>
           </Column>
