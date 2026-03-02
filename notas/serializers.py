@@ -32,7 +32,7 @@ class NotaListSerializer(serializers.ModelSerializer):
     def get_responsable(self, obj):
         """Retorna el nombre completo del responsable."""
         if obj.responsable:
-            return obj.responsable.nombre_completo
+            return {'id': obj.responsable.id, 'nombre_completo': obj.responsable.nombre_completo}
         return None
     
     def get_atrasada(self, obj):
@@ -50,11 +50,11 @@ class NotaCreateSerializer(serializers.Serializer):
     Campos exactos que envía el frontend.
     """
     sector_origen_id = serializers.IntegerField(required=True)
-    responsable_id = serializers.IntegerField(required=True)
+    responsable_id = serializers.IntegerField(required=False, allow_null=True)
     tema = serializers.CharField(required=True, max_length=100)
     tarea_asignada = serializers.CharField(required=False, allow_blank=True, max_length=200)
     prioridad = serializers.CharField(required=False, default='MEDIA')
-    numero_nota_externo = serializers.CharField(required=False, allow_blank=True, default='')
+    numero_nota_externo = serializers.CharField(required=False, allow_blank=True, allow_null=True, default='')
     tiene_numero_formal = serializers.BooleanField(required=False, default=False)
     fecha_ingreso = serializers.DateTimeField(required=False)
 
@@ -62,20 +62,26 @@ class NotaCreateSerializer(serializers.Serializer):
         from usuarios.models import Usuario
 
         sector_origen_id = validated_data['sector_origen_id']
-        responsable_id = validated_data['responsable_id']
+        responsable_id = validated_data.get('responsable_id')
         numero_externo = (validated_data.get('numero_nota_externo') or '').strip()
         sector = Sector.objects.get(id=sector_origen_id)
-        responsable = Usuario.objects.get(id=responsable_id)
         request = self.context.get('request')
 
-        # Si hay numero_nota_externo: construir numero_nota y tiene_numero_formal=True
-        # Si no: dejar que Nota.save() genere el número
+        # Si viene responsable_id: asignar responsable y estado ASIGNADA; si no, INGRESADA sin responsable.
+        if responsable_id is not None:
+            responsable = Usuario.objects.get(id=responsable_id)
+            estado_inicial = EstadoChoices.ASIGNADA
+        else:
+            responsable = None
+            estado_inicial = EstadoChoices.INGRESADA
+
+        # Si numero_nota_externo está vacío o None: tiene_numero_formal=False y NO asignar numero_nota;
+        # Nota.save() generará el número automáticamente.
         numero_nota = ''
-        tiene_numero_formal = False
-        if numero_externo:
+        tiene_numero_formal = bool(numero_externo)
+        if tiene_numero_formal:
             año = timezone.now().year
             numero_nota = f"{sector.numero}-{numero_externo}-{año}"
-            tiene_numero_formal = True
 
         fecha_ingreso = validated_data.get('fecha_ingreso') or timezone.now()
 
@@ -85,13 +91,13 @@ class NotaCreateSerializer(serializers.Serializer):
             creado_por=request.user if request and request.user.is_authenticated else None,
             remitente='',
             area_origen='',
-            estado=EstadoChoices.INGRESADA,
+            estado=estado_inicial,
             tema=validated_data['tema'],
             tarea_asignada=validated_data.get('tarea_asignada', '') or '',
             prioridad=validated_data.get('prioridad', 'MEDIA'),
             tiene_numero_formal=tiene_numero_formal,
             fecha_ingreso=fecha_ingreso,
-            numero_nota=numero_nota if numero_nota else '',  # vacío para que save() genere si corresponde
+            numero_nota=numero_nota,
         )
         return nota
 
@@ -147,9 +153,9 @@ class NotaDetalleSerializer(serializers.ModelSerializer):
         ]
     
     def get_responsable(self, obj):
-        """Retorna el nombre completo del responsable."""
+        
         if obj.responsable:
-            return obj.responsable.nombre_completo
+            return {'id': obj.responsable.id, 'nombre_completo': obj.responsable.nombre_completo}
         return None
     
     def get_creado_por(self, obj):
@@ -203,12 +209,8 @@ class NotaCambioEstadoSerializer(serializers.Serializer):
         motivo = data.get('motivo', '')
         responsable_nuevo = data.get('responsable_nuevo')
         
-        # Estados que requieren motivo obligatorio
-        estados_con_motivo = [
-            EstadoChoices.EN_ESPERA,
-            EstadoChoices.DEVUELTA,
-            EstadoChoices.ANULADA
-        ]
+        # Estados que requieren motivo obligatorio (solo EN_ESPERA en el flujo actual)
+        estados_con_motivo = [EstadoChoices.EN_ESPERA]
         
         if estado_nuevo in estados_con_motivo and not motivo:
             raise serializers.ValidationError({

@@ -12,7 +12,6 @@ from usuarios.permissions import (
     EstaAutenticado,
     EsDirectorJefeOAdmin,
     PuedeCrearNota,
-    PuedeVerTodasLasNotas,
     PuedeVerNotas,
     PuedeAnularNota,
 )
@@ -60,10 +59,8 @@ class NotaViewSet(viewsets.ModelViewSet):
             return [EstaAutenticado(), EsDirectorJefeOAdmin()]
         if self.action == 'cambiar_estado':
             return [EstaAutenticado()]
-        if self.action == 'pendientes':
+        if self.action in ('pendientes', 'atrasadas'):
             return [EstaAutenticado()]
-        if self.action == 'atrasadas':
-            return [EstaAutenticado(), PuedeVerTodasLasNotas()]
         return [EstaAutenticado()]
 
     def get_serializer_class(self):
@@ -136,6 +133,16 @@ class NotaViewSet(viewsets.ModelViewSet):
                 estado_nuevo=EstadoChoices.INGRESADA,
                 descripcion_cambio='Nota creada en el sistema'
             )
+            if nota.estado == EstadoChoices.ASIGNADA:
+                crear_registro_historial(
+                    nota=nota,
+                    usuario=request.user,
+                    tipo_evento=TipoEventoChoices.CAMBIO_ESTADO,
+                    estado_anterior=EstadoChoices.INGRESADA,
+                    estado_nuevo=EstadoChoices.ASIGNADA,
+                    responsable_nuevo=nota.responsable,
+                    descripcion_cambio='Nota asignada al momento de la creación'
+                )
 
         headers = self.get_success_headers(serializer.data)
         return Response(
@@ -236,7 +243,7 @@ class NotaViewSet(viewsets.ModelViewSet):
         motivo = serializer.validated_data.get('motivo', '')
         responsable_nuevo_id = serializer.validated_data.get('responsable_nuevo', None)
         
-        # Validar transición permitida
+        # Validar transición permitida (rechaza ANULADA y EN_REVISION)
         if not es_transicion_permitida(estado_actual, estado_nuevo):
             return Response(
                 {
@@ -246,20 +253,8 @@ class NotaViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Validar permiso para anular: solo Admin o Director
-        if estado_nuevo == EstadoChoices.ANULADA:
-            if not request.user.is_authenticated or not getattr(request.user, 'puede_anular_nota', lambda: False)():
-                return Response(
-                    {'error': 'Sin permiso', 'detalle': 'Solo Director o Administrador pueden anular notas.'},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-        
-        # Validar motivo obligatorio
-        estados_con_motivo = [
-            EstadoChoices.EN_ESPERA,
-            EstadoChoices.DEVUELTA,
-            EstadoChoices.ANULADA
-        ]
+        # Validar motivo obligatorio (solo EN_ESPERA requiere motivo)
+        estados_con_motivo = [EstadoChoices.EN_ESPERA]
         if estado_nuevo in estados_con_motivo and not motivo:
             return Response(
                 {
@@ -285,25 +280,18 @@ class NotaViewSet(viewsets.ModelViewSet):
         # Actualizar nota
         nota.estado = estado_nuevo
         
-        # Actualizar responsable si corresponde
+        # Actualizar responsable si corresponde (ASIGNADA requiere responsable_nuevo)
         responsable_nuevo = None
         if responsable_nuevo_id:
             from usuarios.models import Usuario
             responsable_nuevo = get_object_or_404(Usuario, id=responsable_nuevo_id)
             nota.responsable = responsable_nuevo
-        
-        # Manejar anulación
-        if estado_nuevo == EstadoChoices.ANULADA:
-            nota.anulada = True
-            nota.motivo_anulacion = motivo
-        
+
         nota.save()
         
         # Determinar tipo de evento
         tipo_evento = TipoEventoChoices.CAMBIO_ESTADO
-        if estado_nuevo == EstadoChoices.ANULADA:
-            tipo_evento = TipoEventoChoices.ANULACION
-        elif estado_nuevo == EstadoChoices.ARCHIVADA:
+        if estado_nuevo == EstadoChoices.ARCHIVADA:
             tipo_evento = TipoEventoChoices.ARCHIVADO
         elif responsable_nuevo_id and responsable_anterior:
             tipo_evento = TipoEventoChoices.REASIGNACION
@@ -349,15 +337,20 @@ class NotaViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def atrasadas(self, request):
         """
-        Lista las notas con fecha_limite < hoy y estado no en [ARCHIVADA, ANULADA]
+        Lista las notas con fecha_limite < hoy y estado no en [ARCHIVADA, ANULADA].
+        Accesible por cualquier usuario autenticado; operadores solo ven las propias/asignadas.
         """
+        user = request.user
         hoy = timezone.now().date()
         queryset = Nota.objects.filter(
             fecha_limite__lt=hoy
         ).exclude(
             estado__in=[EstadoChoices.ARCHIVADA, EstadoChoices.ANULADA]
-        ).order_by('fecha_limite')
-        
+        )
+        if user.is_authenticated and hasattr(user, 'puede_ver_todas_las_notas') and not user.puede_ver_todas_las_notas():
+            queryset = queryset.filter(Q(responsable=user) | Q(creado_por=user))
+        queryset = queryset.order_by('fecha_limite')
+
         serializer = NotaListSerializer(queryset, many=True)
         return Response(serializer.data)
 

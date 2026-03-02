@@ -127,7 +127,7 @@ export function esDelMesActual(fechaStr) {
 /** Devuelve true si fecha_ingreso es hoy */
 export function esHoy(fechaStr) {
   if (!fechaStr) return false
-  const d = new Date(fechaStr + 'T12:00:00')
+  const d = new Date(fechaStr)
   const hoy = new Date()
   return (
     d.getFullYear() === hoy.getFullYear() &&

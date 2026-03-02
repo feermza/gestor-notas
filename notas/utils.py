@@ -47,57 +47,30 @@ def generar_numero_nota():
     return f'NOTA-{año_actual}-{numero_formateado}'
 
 
-# Diccionario de transiciones permitidas según .cursorrules
+# Diccionario de transiciones permitidas (flujo definitivo).
+# No se admiten ANULADA ni EN_REVISION.
 TRANSICIONES_PERMITIDAS = {
-    EstadoChoices.INGRESADA: [EstadoChoices.EN_REVISION],
-    EstadoChoices.EN_REVISION: [EstadoChoices.ASIGNADA],
-    EstadoChoices.ASIGNADA: [EstadoChoices.EN_PROCESO],
+    EstadoChoices.INGRESADA: [EstadoChoices.ASIGNADA, EstadoChoices.ARCHIVADA],
+    EstadoChoices.ASIGNADA: [EstadoChoices.EN_PROCESO, EstadoChoices.ASIGNADA, EstadoChoices.ARCHIVADA],
     EstadoChoices.EN_PROCESO: [
+        EstadoChoices.RESUELTA,
         EstadoChoices.EN_ESPERA,
-        EstadoChoices.DEVUELTA,
-        EstadoChoices.RESUELTA
-    ],
-    EstadoChoices.EN_ESPERA: [EstadoChoices.EN_PROCESO],
-    EstadoChoices.DEVUELTA: [EstadoChoices.ASIGNADA],
-    EstadoChoices.RESUELTA: [
         EstadoChoices.ARCHIVADA,
-        EstadoChoices.EN_PROCESO
     ],
-    # ANULADA puede venir desde cualquier estado activo
-    # Se maneja como caso especial
+    EstadoChoices.EN_ESPERA: [EstadoChoices.EN_PROCESO, EstadoChoices.ARCHIVADA],
+    EstadoChoices.RESUELTA: [EstadoChoices.ARCHIVADA],
 }
-
-# Estados activos (no finales)
-ESTADOS_ACTIVOS = [
-    EstadoChoices.INGRESADA,
-    EstadoChoices.EN_REVISION,
-    EstadoChoices.ASIGNADA,
-    EstadoChoices.EN_PROCESO,
-    EstadoChoices.EN_ESPERA,
-    EstadoChoices.DEVUELTA,
-    EstadoChoices.RESUELTA
-]
 
 
 def es_transicion_permitida(estado_actual, estado_nuevo):
     """
     Valida si una transición de estado es permitida según las reglas de negocio.
-    
-    Args:
-        estado_actual: Estado actual de la nota
-        estado_nuevo: Estado al que se quiere transicionar
-    
-    Returns:
-        bool: True si la transición es permitida, False en caso contrario
+    Rechaza explícitamente ANULADA y EN_REVISION.
     """
-    # ANULADA puede venir desde cualquier estado activo
-    if estado_nuevo == EstadoChoices.ANULADA:
-        return estado_actual in ESTADOS_ACTIVOS
-    
-    # Verificar transiciones normales
+    if estado_nuevo in (EstadoChoices.ANULADA, EstadoChoices.EN_REVISION):
+        return False
     if estado_actual in TRANSICIONES_PERMITIDAS:
         return estado_nuevo in TRANSICIONES_PERMITIDAS[estado_actual]
-    
     return False
 
 

@@ -28,23 +28,22 @@ const enviandoAccion = ref(false)
 // Dialogs
 const dialogAsignar = ref(false)
 const dialogMotivo = ref(false)
-const dialogAnular = ref(false)
 
 // Formularios de dialogs
 const asignarResponsableId = ref(null)
 const asignarMotivo = ref('')
 const motivoTexto = ref('')
-const motivoResponsableId = ref(null) // para DEVUELTA
-const accionPendiente = ref(null) // { estado_nuevo, requiereResponsable, requiereMotivo }
+const accionPendiente = ref(null) // { tipo: 'asignar'|'reasignar'|'en_espera'|'devolver', estado_nuevo }
 
-// Opciones para dropdowns
-const opcionesUsuarios = computed(() =>
+// Usuarios para dropdown (excluir CONSULTOR)
+const usuariosParaAsignar = computed(() =>
   usuarios.value
     .filter((u) => u.rol !== 'CONSULTOR')
     .map((u) => ({
-      value: u.id,
-      label: `${u.nombre_completo} (${u.rol_display || u.rol})`,
-    }))
+      ...u,
+      nombre_completo:
+        u.nombre_completo || `${u.apellido || ''}, ${u.nombres || ''}`.trim() || u.email,
+    })),
 )
 
 const notaId = computed(() => route.params.id)
@@ -63,19 +62,17 @@ const sectorOrigenDisplay = computed(() => {
 // Usuario actual (store de auth)
 const authStore = useAuthStore()
 const usuarioActual = computed(() => authStore.usuario ?? null)
-const rol = computed(() => usuarioActual.value?.rol ?? null)
-const esResponsable = computed(() => {
-  if (!nota.value || !usuarioActual.value) return false
-  const responsableId = nota.value.responsable_id ?? (typeof nota.value.responsable === 'object' ? nota.value.responsable?.id : null)
-  if (responsableId) return usuarioActual.value.id === responsableId
-  // Si la API solo devuelve responsable como string (nombre_completo), comparar por nombre
-  const respStr = (nota.value.responsable || '').trim()
-  const miNombre = (usuarioActual.value.nombre_completo || '').trim()
-  return respStr && miNombre && respStr === miNombre
-})
-const puedeSupervisorOAdmin = computed(() =>
-  rol.value === 'SUPERVISOR' || rol.value === 'ADMINISTRADOR'
+
+const esSupervisorOAdmin = computed(() =>
+  ['SUPERVISOR', 'ADMINISTRADOR'].includes(usuarioActual.value?.rol),
 )
+
+const esResponsable = computed(() => {
+  const idUsuario = Number(usuarioActual.value?.id)
+  const idResponsable = Number(nota.value?.responsable?.id)
+  console.log('DEBUG:', { idUsuario, idResponsable })
+  return idUsuario === idResponsable
+})
 
 // Iniciales del responsable para avatar
 const responsableIniciales = computed(() => {
@@ -178,7 +175,11 @@ async function ejecutarCambioEstado(payload) {
   enviandoAccion.value = true
   try {
     await post(`/api/notas/${notaId.value}/cambiar_estado/`, payload)
-    toast.add({ severity: 'success', summary: 'Estado actualizado', detail: 'La nota se actualizó correctamente.' })
+    toast.add({
+      severity: 'success',
+      summary: 'Estado actualizado',
+      detail: 'La nota se actualizó correctamente.',
+    })
     await cargarNota()
     cerrarDialogs()
   } catch (e) {
@@ -192,16 +193,15 @@ async function ejecutarCambioEstado(payload) {
 function cerrarDialogs() {
   dialogAsignar.value = false
   dialogMotivo.value = false
-  dialogAnular.value = false
   accionPendiente.value = null
   asignarResponsableId.value = null
   asignarMotivo.value = ''
   motivoTexto.value = ''
-  motivoResponsableId.value = null
 }
 
-function abrirAsignar() {
-  accionPendiente.value = { estado_nuevo: 'ASIGNADA', requiereResponsable: true, requiereMotivo: false }
+// Dialog Asignar: para Asignar (INGRESADA) y Reasignar (ASIGNADA)
+function abrirAsignar(tipo) {
+  accionPendiente.value = { tipo: tipo || 'asignar', estado_nuevo: 'ASIGNADA' }
   asignarResponsableId.value = null
   asignarMotivo.value = ''
   dialogAsignar.value = true
@@ -209,67 +209,50 @@ function abrirAsignar() {
 
 function confirmarAsignar() {
   if (!asignarResponsableId.value) {
-    toast.add({ severity: 'warn', summary: 'Falta responsable', detail: 'Seleccioná un responsable.' })
+    toast.add({
+      severity: 'warn',
+      summary: 'Falta responsable',
+      detail: 'Seleccioná un responsable.',
+    })
     return
   }
-  ejecutarCambioEstado({
+  const payload = {
     estado_nuevo: 'ASIGNADA',
     responsable_nuevo: asignarResponsableId.value,
-    motivo: asignarMotivo.value || undefined,
-  })
+  }
+  if (asignarMotivo.value?.trim()) payload.motivo = asignarMotivo.value.trim()
+  ejecutarCambioEstado(payload)
 }
 
-function abrirMotivo(estadoNuevo, requiereResponsable = false) {
-  accionPendiente.value = {
-    estado_nuevo: estadoNuevo,
-    requiereResponsable,
-    requiereMotivo: true,
-  }
+// Dialog Motivo: para EN_ESPERA y Devolver al sector
+function abrirMotivo(tipo) {
+  accionPendiente.value = { tipo, estado_nuevo: tipo === 'en_espera' ? 'EN_ESPERA' : 'ARCHIVADA' }
   motivoTexto.value = ''
-  motivoResponsableId.value = null
   dialogMotivo.value = true
 }
 
 function confirmarMotivo() {
   const acc = accionPendiente.value
-  if (!acc || !motivoTexto.value.trim()) {
-    toast.add({ severity: 'warn', summary: 'Motivo obligatorio', detail: 'Ingresá el motivo.' })
+  const motivo = motivoTexto.value?.trim() || ''
+  if (!acc) return
+  if (motivo.length < 10) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Motivo obligatorio',
+      detail: 'El motivo debe tener al menos 10 caracteres.',
+    })
     return
   }
-  if (acc.requiereResponsable && !motivoResponsableId.value) {
-    toast.add({ severity: 'warn', summary: 'Falta responsable', detail: 'Seleccioná el nuevo responsable.' })
-    return
+  let payload
+  if (acc.tipo === 'en_espera') {
+    payload = { estado_nuevo: 'EN_ESPERA', motivo }
+  } else {
+    payload = { estado_nuevo: 'ARCHIVADA', motivo: 'Devuelta al sector: ' + motivo }
   }
-  const payload = {
-    estado_nuevo: acc.estado_nuevo,
-    motivo: motivoTexto.value.trim(),
-  }
-  if (acc.requiereResponsable) payload.responsable_nuevo = motivoResponsableId.value
   ejecutarCambioEstado(payload)
 }
 
-function abrirAnular() {
-  accionPendiente.value = { estado_nuevo: 'ANULADA', requiereMotivo: true }
-  motivoTexto.value = ''
-  dialogAnular.value = true
-}
-
-function confirmarAnular() {
-  if (!motivoTexto.value.trim()) {
-    toast.add({ severity: 'warn', summary: 'Motivo obligatorio', detail: 'Ingresá el motivo de anulación.' })
-    return
-  }
-  ejecutarCambioEstado({
-    estado_nuevo: 'ANULADA',
-    motivo: motivoTexto.value.trim(),
-  })
-}
-
 // Acciones directas (sin dialog)
-function ponerEnRevision() {
-  ejecutarCambioEstado({ estado_nuevo: 'EN_REVISION' })
-}
-
 function iniciarProceso() {
   ejecutarCambioEstado({ estado_nuevo: 'EN_PROCESO' })
 }
@@ -278,44 +261,13 @@ function marcarResuelta() {
   ejecutarCambioEstado({ estado_nuevo: 'RESUELTA' })
 }
 
+function retomar() {
+  ejecutarCambioEstado({ estado_nuevo: 'EN_PROCESO' })
+}
+
 function archivar() {
   ejecutarCambioEstado({ estado_nuevo: 'ARCHIVADA' })
 }
-
-// Botones de acciones disponibles
-const accionesDisponibles = computed(() => {
-  const n = nota.value
-  const estado = n?.estado
-  const acciones = []
-
-  if (estado === 'INGRESADA' && puedeSupervisorOAdmin.value) {
-    acciones.push({ label: 'Poner en Revisión', icon: 'pi-arrow-right', handler: ponerEnRevision, estado_nuevo: 'EN_REVISION' })
-  }
-
-  if (estado === 'EN_REVISION' && puedeSupervisorOAdmin.value) {
-    acciones.push({ label: 'Asignar', icon: 'pi-user-plus', dialog: 'asignar' })
-  }
-
-  if (estado === 'ASIGNADA' && (esResponsable.value || puedeSupervisorOAdmin.value)) {
-    acciones.push({ label: 'Iniciar proceso', icon: 'pi-play', handler: iniciarProceso, estado_nuevo: 'EN_PROCESO' })
-  }
-
-  if (estado === 'EN_PROCESO' && (esResponsable.value || puedeSupervisorOAdmin.value)) {
-    acciones.push({ label: 'Marcar como resuelta', icon: 'pi-check', handler: marcarResuelta, estado_nuevo: 'RESUELTA' })
-    acciones.push({ label: 'Poner en espera', icon: 'pi-clock', dialog: 'motivo', estado_nuevo: 'EN_ESPERA' })
-    acciones.push({ label: 'Devolver', icon: 'pi-replay', dialog: 'motivo-devolver', estado_nuevo: 'DEVUELTA' })
-  }
-
-  if (estado === 'RESUELTA' && (esResponsable.value || puedeSupervisorOAdmin.value)) {
-    acciones.push({ label: 'Archivar', icon: 'pi-archive', handler: archivar, estado_nuevo: 'ARCHIVADA' })
-  }
-
-  if (estado && estado !== 'ANULADA' && estado !== 'ARCHIVADA' && puedeSupervisorOAdmin.value) {
-    acciones.push({ label: 'Anular', icon: 'pi-times-circle', dialog: 'anular', severity: 'danger', estado_nuevo: 'ANULADA' })
-  }
-
-  return acciones
-})
 
 onMounted(() => {
   Promise.all([cargarNota(), cargarSectores(), cargarUsuarios()])
@@ -381,7 +333,9 @@ watch(notaId, (nuevo) => {
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Número de nota</p>
-                  <p class="font-mono text-lg text-[#1e3a5f] font-semibold">{{ nota.numero_nota || '—' }}</p>
+                  <p class="font-mono text-lg text-[#1e3a5f] font-semibold">
+                    {{ nota.numero_nota || '—' }}
+                  </p>
                 </div>
                 <div>
                   <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Sector de origen</p>
@@ -411,7 +365,9 @@ watch(notaId, (nuevo) => {
                   <i class="pi pi-flag text-orange-500 mt-0.5" />
                   <p class="text-gray-700">{{ nota.tarea_asignada }}</p>
                 </div>
-                <div v-if="nota.descripcion" class="text-gray-700 whitespace-pre-wrap">{{ nota.descripcion }}</div>
+                <div v-if="nota.descripcion" class="text-gray-700 whitespace-pre-wrap">
+                  {{ nota.descripcion }}
+                </div>
               </div>
             </template>
           </Card>
@@ -428,17 +384,24 @@ watch(notaId, (nuevo) => {
                 >
                   <div
                     class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-                    :style="{ backgroundColor: colorIconoEvento(ev.tipo_evento) + '20', color: colorIconoEvento(ev.tipo_evento) }"
+                    :style="{
+                      backgroundColor: colorIconoEvento(ev.tipo_evento) + '20',
+                      color: colorIconoEvento(ev.tipo_evento),
+                    }"
                   >
                     <i :class="['pi', iconoEvento(ev.tipo_evento)]" class="text-sm" />
                   </div>
                   <div class="flex-1 min-w-0">
                     <p class="text-xs text-gray-500">{{ formatoFechaHora(ev.fecha_hora) }}</p>
                     <p class="text-sm font-medium text-gray-800">{{ ev.usuario || 'Sistema' }}</p>
-                    <p class="text-sm text-gray-600">{{ ev.descripcion_cambio || ev.tipo_evento }}</p>
+                    <p class="text-sm text-gray-600">
+                      {{ ev.descripcion_cambio || ev.tipo_evento }}
+                    </p>
                   </div>
                 </div>
-                <p v-if="!historialOrdenado.length" class="text-gray-500 text-sm py-2">Sin registros en el historial.</p>
+                <p v-if="!historialOrdenado.length" class="text-gray-500 text-sm py-2">
+                  Sin registros en el historial.
+                </p>
               </div>
             </template>
           </Card>
@@ -449,14 +412,18 @@ watch(notaId, (nuevo) => {
             <template #content>
               <ul class="space-y-2">
                 <li
-                  v-for="adj in (nota.adjuntos || [])"
+                  v-for="adj in nota.adjuntos || []"
                   :key="adj.id"
                   class="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg"
                 >
                   <div class="min-w-0 flex-1 mr-2">
-                    <p class="text-sm font-medium text-gray-800 truncate">{{ adj.nombre_archivo }}</p>
+                    <p class="text-sm font-medium text-gray-800 truncate">
+                      {{ adj.nombre_archivo }}
+                    </p>
                     <p class="text-xs text-gray-500">
-                      {{ adj.tipo_adjunto }} · {{ adj.tamaño_formateado || adj.tamaño_bytes + ' bytes' }} · {{ formatoFechaHora(adj.fecha_subida) }}
+                      {{ adj.tipo_adjunto }} ·
+                      {{ adj.tamaño_formateado || adj.tamaño_bytes + ' bytes' }} ·
+                      {{ formatoFechaHora(adj.fecha_subida) }}
                     </p>
                   </div>
                   <Button
@@ -469,9 +436,11 @@ watch(notaId, (nuevo) => {
                   />
                 </li>
               </ul>
-              <p v-if="!nota.adjuntos?.length" class="text-gray-500 text-sm py-2">No hay adjuntos.</p>
+              <p v-if="!nota.adjuntos?.length" class="text-gray-500 text-sm py-2">
+                No hay adjuntos.
+              </p>
               <Button
-                v-if="puedeSupervisorOAdmin || esResponsable"
+                v-if="esSupervisorOAdmin || esResponsable"
                 label="Agregar adjunto"
                 icon="pi pi-paperclip"
                 class="mt-2"
@@ -510,68 +479,200 @@ watch(notaId, (nuevo) => {
                     >
                       {{ responsableIniciales }}
                     </div>
-                    <span class="text-gray-800">{{ nota.responsable || 'Sin asignar' }}</span>
+                    <span class="text-gray-800">{{
+                      nota.responsable?.nombre_completo || 'Sin asignar'
+                    }}</span>
                   </div>
                 </div>
                 <div>
-                  <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Última modificación</p>
-                  <p class="text-gray-700 text-sm">{{ formatoFechaHora(nota.ultima_modificacion) }}</p>
+                  <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                    Última modificación
+                  </p>
+                  <p class="text-gray-700 text-sm">
+                    {{ formatoFechaHora(nota.ultima_modificacion) }}
+                  </p>
                 </div>
               </div>
             </template>
           </Card>
 
-          <!-- Card Acciones disponibles -->
+          <!-- Card Acciones disponibles: lógica por estado con v-if separados para responsable y supervisor -->
           <Card>
             <template #title>Acciones disponibles</template>
             <template #content>
-              <div class="flex flex-col gap-2">
-                <template v-for="(acc, i) in accionesDisponibles" :key="i">
-                  <Button
-                    v-if="acc.handler"
-                    :label="acc.label"
-                    :icon="'pi ' + acc.icon"
-                    class="w-full justify-start"
-                    :severity="acc.severity === 'danger' ? 'danger' : 'secondary'"
-                    :loading="enviandoAccion"
-                    @click="acc.handler"
-                  />
-                  <template v-else>
-                    <Button
-                      v-if="acc.dialog === 'asignar'"
-                      label="Asignar"
-                      icon="pi pi-user-plus"
-                      class="w-full justify-start"
-                      severity="secondary"
-                      @click="abrirAsignar"
-                    />
-                    <Button
-                      v-else-if="acc.dialog === 'motivo'"
-                      :label="acc.label"
-                      :icon="'pi ' + acc.icon"
-                      class="w-full justify-start"
-                      severity="secondary"
-                      @click="abrirMotivo(acc.estado_nuevo, false)"
-                    />
-                    <Button
-                      v-else-if="acc.dialog === 'motivo-devolver'"
-                      label="Devolver"
-                      icon="pi pi-replay"
-                      class="w-full justify-start"
-                      severity="secondary"
-                      @click="abrirMotivo('DEVUELTA', true)"
-                    />
-                    <Button
-                      v-else-if="acc.dialog === 'anular'"
-                      label="Anular"
-                      icon="pi pi-times-circle"
-                      class="w-full justify-start"
-                      severity="danger"
-                      @click="abrirAnular"
-                    />
+              <div v-if="nota.estado === 'ARCHIVADA'" class="text-gray-600 text-sm py-2">
+                Esta nota está archivada
+              </div>
+              <div v-else class="flex flex-col gap-2">
+                <!-- INGRESADA: solo supervisor/admin -->
+                <template v-if="nota.estado === 'INGRESADA'">
+                  <template v-if="esSupervisorOAdmin">
+                    <button
+                      type="button"
+                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#1e3a5f] hover:bg-[#2d4f7c] transition-colors"
+                      :disabled="enviandoAccion"
+                      @click="abrirAsignar('asignar')"
+                    >
+                      Asignar
+                    </button>
+                    <button
+                      type="button"
+                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#64748b] hover:bg-[#475569] transition-colors"
+                      :disabled="enviandoAccion"
+                      @click="archivar"
+                    >
+                      Archivar
+                    </button>
+                    <button
+                      type="button"
+                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#f97316] hover:bg-[#ea580c] transition-colors"
+                      :disabled="enviandoAccion"
+                      @click="abrirMotivo('devolver')"
+                    >
+                      Devolver al sector
+                    </button>
                   </template>
                 </template>
-                <p v-if="!accionesDisponibles.length" class="text-gray-500 text-sm">No hay acciones disponibles.</p>
+
+                <!-- ASIGNADA: responsable → Iniciar proceso; supervisor → Reasignar, Archivar, Devolver -->
+                <template v-if="nota.estado === 'ASIGNADA'">
+                  <button
+                    v-if="esResponsable"
+                    type="button"
+                    class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#1e3a5f] hover:bg-[#2d4f7c] transition-colors"
+                    :disabled="enviandoAccion"
+                    @click="iniciarProceso"
+                  >
+                    Iniciar proceso
+                  </button>
+                  <template v-if="esSupervisorOAdmin">
+                    <button
+                      type="button"
+                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#64748b] hover:bg-[#475569] transition-colors"
+                      :disabled="enviandoAccion"
+                      @click="abrirAsignar('reasignar')"
+                    >
+                      Reasignar
+                    </button>
+                    <button
+                      type="button"
+                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#64748b] hover:bg-[#475569] transition-colors"
+                      :disabled="enviandoAccion"
+                      @click="archivar"
+                    >
+                      Archivar
+                    </button>
+                    <button
+                      type="button"
+                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#f97316] hover:bg-[#ea580c] transition-colors"
+                      :disabled="enviandoAccion"
+                      @click="abrirMotivo('devolver')"
+                    >
+                      Devolver al sector
+                    </button>
+                  </template>
+                </template>
+
+                <!-- EN_PROCESO: responsable → Marcar resuelta, Poner en espera; supervisor → Reasignar, Archivar, Devolver -->
+                <template v-if="nota.estado === 'EN_PROCESO'">
+                  <template v-if="esResponsable">
+                    <button
+                      type="button"
+                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#059669] hover:bg-[#047857] transition-colors"
+                      :disabled="enviandoAccion"
+                      @click="marcarResuelta"
+                    >
+                      Marcar como resuelta
+                    </button>
+                    <button
+                      type="button"
+                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#d97706] hover:bg-[#b45309] transition-colors"
+                      :disabled="enviandoAccion"
+                      @click="abrirMotivo('en_espera')"
+                    >
+                      Poner en espera
+                    </button>
+                  </template>
+                  <template v-if="esSupervisorOAdmin">
+                    <button
+                      type="button"
+                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#64748b] hover:bg-[#475569] transition-colors"
+                      :disabled="enviandoAccion"
+                      @click="abrirAsignar('reasignar')"
+                    >
+                      Reasignar
+                    </button>
+                    <button
+                      type="button"
+                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#64748b] hover:bg-[#475569] transition-colors"
+                      :disabled="enviandoAccion"
+                      @click="archivar"
+                    >
+                      Archivar
+                    </button>
+                    <button
+                      type="button"
+                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#f97316] hover:bg-[#ea580c] transition-colors"
+                      :disabled="enviandoAccion"
+                      @click="abrirMotivo('devolver')"
+                    >
+                      Devolver al sector
+                    </button>
+                  </template>
+                </template>
+
+                <!-- EN_ESPERA: responsable → Retomar; supervisor → Reasignar, Archivar, Devolver -->
+                <template v-if="nota.estado === 'EN_ESPERA'">
+                  <button
+                    v-if="esResponsable"
+                    type="button"
+                    class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#1e3a5f] hover:bg-[#2d4f7c] transition-colors"
+                    :disabled="enviandoAccion"
+                    @click="retomar"
+                  >
+                    Retomar
+                  </button>
+                  <template v-if="esSupervisorOAdmin">
+                    <button
+                      type="button"
+                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#64748b] hover:bg-[#475569] transition-colors"
+                      :disabled="enviandoAccion"
+                      @click="abrirAsignar('reasignar')"
+                    >
+                      Reasignar
+                    </button>
+                    <button
+                      type="button"
+                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#64748b] hover:bg-[#475569] transition-colors"
+                      :disabled="enviandoAccion"
+                      @click="archivar"
+                    >
+                      Archivar
+                    </button>
+                    <button
+                      type="button"
+                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#f97316] hover:bg-[#ea580c] transition-colors"
+                      :disabled="enviandoAccion"
+                      @click="abrirMotivo('devolver')"
+                    >
+                      Devolver al sector
+                    </button>
+                  </template>
+                </template>
+
+                <!-- RESUELTA: Archivar si responsable o supervisor -->
+                <template
+                  v-if="nota.estado === 'RESUELTA' && (esResponsable || esSupervisorOAdmin)"
+                >
+                  <button
+                    type="button"
+                    class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#065f46] hover:bg-[#064e3b] transition-colors"
+                    :disabled="enviandoAccion"
+                    @click="archivar"
+                  >
+                    Archivar
+                  </button>
+                </template>
               </div>
             </template>
           </Card>
@@ -587,7 +688,9 @@ watch(notaId, (nuevo) => {
                     :value="labelPrioridad(nota.prioridad)"
                     :style="{
                       background: colorPrioridad(nota.prioridad),
-                      color: ['BAJA', 'MEDIA', 'NORMAL'].includes(nota.prioridad) ? '#1e293b' : 'white',
+                      color: ['BAJA', 'MEDIA', 'NORMAL'].includes(nota.prioridad)
+                        ? '#1e293b'
+                        : 'white',
                       border: 'none',
                     }"
                     class="!text-xs"
@@ -600,11 +703,15 @@ watch(notaId, (nuevo) => {
                 </div>
                 <template v-if="nota.genera_resolucion">
                   <div v-if="nota.numero_resolucion">
-                    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Número de resolución</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                      Número de resolución
+                    </p>
                     <p class="text-sm text-gray-800">{{ nota.numero_resolucion }}</p>
                   </div>
                   <div v-if="nota.fecha_resolucion">
-                    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Fecha de resolución</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                      Fecha de resolución
+                    </p>
                     <p class="text-sm text-gray-800">{{ formatoFecha(nota.fecha_resolucion) }}</p>
                   </div>
                 </template>
@@ -615,10 +722,10 @@ watch(notaId, (nuevo) => {
       </div>
     </div>
 
-    <!-- Dialog Asignar responsable -->
+    <!-- Dialog Asignar / Reasignar -->
     <Dialog
       v-model:visible="dialogAsignar"
-      header="Asignar responsable"
+      :header="accionPendiente?.tipo === 'reasignar' ? 'Reasignar nota' : 'Asignar nota'"
       :modal="true"
       :closable="true"
       :style="{ width: '400px' }"
@@ -629,60 +736,38 @@ watch(notaId, (nuevo) => {
           <label class="block text-sm font-medium text-gray-700 mb-1">Responsable</label>
           <Dropdown
             v-model="asignarResponsableId"
-            :options="opcionesUsuarios"
-            option-label="label"
-            option-value="value"
+            :options="usuariosParaAsignar"
+            option-label="nombre_completo"
+            option-value="id"
             placeholder="Seleccionar responsable"
             class="w-full"
           />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Motivo (opcional)</label>
-          <Textarea v-model="asignarMotivo" rows="2" class="w-full" placeholder="Motivo de la asignación" />
-        </div>
-      </div>
-      <template #footer>
-        <Button label="Cancelar" text @click="cerrarDialogs" />
-        <Button label="Confirmar" icon="pi pi-check" :loading="enviandoAccion" @click="confirmarAsignar" />
-      </template>
-    </Dialog>
-
-    <!-- Dialog Motivo (EN_ESPERA, DEVUELTA, etc.) -->
-    <Dialog
-      v-model:visible="dialogMotivo"
-      :header="accionPendiente?.estado_nuevo === 'DEVUELTA' ? 'Devolver nota' : 'Ingresar motivo'"
-      :modal="true"
-      :closable="true"
-      :style="{ width: '400px' }"
-      @hide="cerrarDialogs"
-    >
-      <div class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Motivo (obligatorio)</label>
-          <Textarea v-model="motivoTexto" rows="3" class="w-full" placeholder="Describa el motivo" />
-        </div>
-        <div v-if="accionPendiente?.requiereResponsable">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Nuevo responsable</label>
-          <Dropdown
-            v-model="motivoResponsableId"
-            :options="opcionesUsuarios"
-            option-label="label"
-            option-value="value"
-            placeholder="Seleccionar responsable"
+          <Textarea
+            v-model="asignarMotivo"
+            rows="2"
             class="w-full"
+            placeholder="Motivo de la asignación"
           />
         </div>
       </div>
       <template #footer>
         <Button label="Cancelar" text @click="cerrarDialogs" />
-        <Button label="Confirmar" icon="pi pi-check" :loading="enviandoAccion" @click="confirmarMotivo" />
+        <Button
+          label="Confirmar"
+          icon="pi pi-check"
+          :loading="enviandoAccion"
+          @click="confirmarAsignar"
+        />
       </template>
     </Dialog>
 
-    <!-- Dialog Anular -->
+    <!-- Dialog Motivo (EN_ESPERA, Devolver al sector) -->
     <Dialog
-      v-model:visible="dialogAnular"
-      header="Anular nota"
+      v-model:visible="dialogMotivo"
+      :header="accionPendiente?.tipo === 'en_espera' ? 'Motivo de la espera' : 'Devolver al sector'"
       :modal="true"
       :closable="true"
       :style="{ width: '400px' }"
@@ -690,13 +775,25 @@ watch(notaId, (nuevo) => {
     >
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Motivo de anulación (obligatorio)</label>
-          <Textarea v-model="motivoTexto" rows="3" class="w-full" placeholder="Indique el motivo de anulación" />
+          <label class="block text-sm font-medium text-gray-700 mb-1"
+            >Motivo (obligatorio, mínimo 10 caracteres)</label
+          >
+          <Textarea
+            v-model="motivoTexto"
+            rows="3"
+            class="w-full"
+            placeholder="Describa el motivo"
+          />
         </div>
       </div>
       <template #footer>
         <Button label="Cancelar" text @click="cerrarDialogs" />
-        <Button label="Confirmar anulación" icon="pi pi-times" severity="danger" :loading="enviandoAccion" @click="confirmarAnular" />
+        <Button
+          label="Confirmar"
+          icon="pi pi-check"
+          :loading="enviandoAccion"
+          @click="confirmarMotivo"
+        />
       </template>
     </Dialog>
   </div>

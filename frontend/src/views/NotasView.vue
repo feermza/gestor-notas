@@ -92,7 +92,7 @@ function irANueva() {
 
 // Nombre del responsable o "Sin asignar"
 function nombreResponsable(nota) {
-  return nota.responsable || 'Sin asignar'
+  return nota.responsable?.nombre_completo || 'Sin asignar'
 }
 
 // Clase de fila: fondo rojizo si está atrasada

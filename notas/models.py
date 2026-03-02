@@ -295,51 +295,47 @@ class Nota(models.Model):
 
     def _generar_numero_interno(self):
         """
-        Genera número interno automáticamente según las reglas:
-        - Si tiene sector_origen: {sector.numero}-I{contador+1:03d}-{año}
-        - Si NO tiene sector_origen: asignar Mesa de Entradas automáticamente
-        - Usa select_for_update() para evitar duplicados en concurrencia.
+        Genera número interno: {sector.numero}-I{contador:03d}-{año}
+        donde contador = cantidad de notas internas del mismo sector en el año actual + 1.
+        Si sector_origen es None: sector con nombre que contenga "Mesa" o primer sector activo.
+        Usa select_for_update() sobre el sector para evitar duplicados en concurrencia.
         """
-        from django.db import transaction
-        
         año = timezone.now().year
         sector = self.sector_origen
-        
-        # Si no tiene sector_origen, asignar Mesa de Entradas automáticamente
+
         if not sector:
-            try:
-                sector = Sector.objects.get(nombre__icontains='Mesa de Entradas', activo=True)
+            sector = (
+                Sector.objects.filter(activo=True, nombre__icontains='Mesa').first()
+                or Sector.objects.filter(activo=True).order_by('id').first()
+            )
+            if sector:
                 self.sector_origen = sector
-            except Sector.DoesNotExist:
-                # Si no existe Mesa de Entradas, usar INT
-                prefix = 'INT'
-                sector = None
-        
+
         if sector:
-            prefix = str(sector.numero)
-        else:
-            prefix = 'INT'
-        
-        with transaction.atomic():
-            # Buscar última nota del mismo sector/año con formato interno
-            last = Nota.objects.filter(
-                numero_nota__startswith=f"{prefix}-I",
+            Sector.objects.select_for_update().get(pk=sector.pk)
+            contador = Nota.objects.filter(
+                sector_origen=sector,
+                numero_nota__startswith=f"{sector.numero}-I",
                 numero_nota__endswith=f"-{año}"
-            ).select_for_update().order_by('-numero_nota').first()
-            
-            if last:
-                # Extraer secuencia del formato {prefix}-I{seq:03d}-{año}
-                parts = last.numero_nota.split('-')
-                if len(parts) == 3 and parts[1].startswith('I'):
-                    try:
-                        seq = int(parts[1][1:]) + 1
-                    except ValueError:
-                        seq = 1
-                else:
+            ).count()
+            return f"{sector.numero}-I{contador + 1:03d}-{año}"
+
+        prefix = 'INT'
+        last = Nota.objects.filter(
+            numero_nota__startswith=f"{prefix}-I",
+            numero_nota__endswith=f"-{año}"
+        ).select_for_update().order_by('-id').first()
+        if last:
+            parts = last.numero_nota.split('-')
+            if len(parts) == 3 and parts[1].startswith('I'):
+                try:
+                    seq = int(parts[1][1:]) + 1
+                except ValueError:
                     seq = 1
             else:
                 seq = 1
-        
+        else:
+            seq = 1
         return f"{prefix}-I{seq:03d}-{año}"
 
     def esta_atrasada(self):

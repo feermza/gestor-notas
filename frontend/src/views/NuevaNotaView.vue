@@ -57,7 +57,7 @@ const sectoresFormateados = computed(() =>
     .map((s) => ({
       ...s,
       nombre_completo: `${s.numero} — ${s.nombre}`,
-    }))
+    })),
 )
 
 const sectorSeleccionado = computed(() => {
@@ -72,9 +72,8 @@ const usuariosFormateados = computed(() =>
     .map((u) => ({
       ...u,
       nombre_completo:
-        u.nombre_completo ||
-        `${u.apellido || ''}, ${u.nombres || ''} (${u.rol || ''})`.trim(),
-    }))
+        u.nombre_completo || `${u.apellido || ''}, ${u.nombres || ''} (${u.rol || ''})`.trim(),
+    })),
 )
 
 // Prioridad: opciones con color para botones
@@ -83,7 +82,7 @@ const opcionesPrioridad = computed(() =>
     value,
     label: LABELS_PRIORIDAD[value] || value,
     color: COLORES_PRIORIDAD[value] || '#cbd5e1',
-  }))
+  })),
 )
 
 // Contadores
@@ -108,7 +107,7 @@ const fechaIngresoTexto = computed(() =>
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  })
+  }),
 )
 
 const fechaIngresoIso = computed(() => fechaIngreso.value.toISOString())
@@ -134,12 +133,7 @@ function validar() {
   if (!tarea) e.tarea_asignada = 'La tarea asignada es obligatoria.'
   else if (tarea.length < 10)
     e.tarea_asignada = 'La tarea asignada debe tener al menos 10 caracteres.'
-  else if (tarea.length > MAX_TAREA)
-    e.tarea_asignada = `Máximo ${MAX_TAREA} caracteres.`
-
-  if (!form.value.responsable_id) {
-    e.responsable_id = 'Debe seleccionar un responsable.'
-  }
+  else if (tarea.length > MAX_TAREA) e.tarea_asignada = `Máximo ${MAX_TAREA} caracteres.`
 
   errores.value = e
   return Object.keys(e).length === 0
@@ -228,9 +222,12 @@ async function guardar() {
       fecha_ingreso: fechaIngresoIso.value,
       tema,
       tarea_asignada: tarea,
-      responsable_id: form.value.responsable_id,
       prioridad: form.value.prioridad || 'MEDIA',
-      estado: 'INGRESADA',
+    }
+    if (form.value.responsable_id != null && form.value.responsable_id !== '') {
+      payload.responsable_id = form.value.responsable_id
+    } else {
+      payload.responsable_id = null
     }
 
     const nota = await post('/api/notas/', payload)
@@ -248,7 +245,9 @@ async function guardar() {
     toast.add({
       severity: 'success',
       summary: 'Nota creada',
-      detail: 'La nota se guardó correctamente.',
+      detail: form.value.responsable_id
+        ? 'Nota creada y asignada correctamente'
+        : 'Nota creada correctamente',
     })
     router.push('/notas')
   } catch (err) {
@@ -259,13 +258,11 @@ async function guardar() {
         if (key === 'sector_origen_id') errores.value.sector_origen = mensaje
         else if (key === 'responsable_id') errores.value.responsable_id = mensaje
         else if (key === 'tarea_asignada') errores.value.tarea_asignada = mensaje
-        else if (key === 'numero_nota_externo')
-          errores.value.numero_nota_externo = mensaje
+        else if (key === 'numero_nota_externo') errores.value.numero_nota_externo = mensaje
         else errores.value[key] = mensaje
       }
     }
-    errorGeneral.value =
-      data.detalle || data.error || err.message || 'Error al guardar la nota.'
+    errorGeneral.value = data.detalle || data.error || err.message || 'Error al guardar la nota.'
   } finally {
     enviando.value = false
   }
@@ -409,10 +406,10 @@ onMounted(() => {
                 </div>
               </div>
 
-              <!-- Responsable -->
+              <!-- Responsable (opcional) -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">
-                  Responsable <span class="text-red-500">*</span>
+                  Responsable (opcional)
                 </label>
                 <Dropdown
                   v-model="formulario.responsable_id"
@@ -500,9 +497,7 @@ onMounted(() => {
                         ? {
                             backgroundColor: opt.color,
                             color:
-                              opt.value === 'BAJA' || opt.value === 'MEDIA'
-                                ? '#1e293b'
-                                : 'white',
+                              opt.value === 'BAJA' || opt.value === 'MEDIA' ? '#1e293b' : 'white',
                           }
                         : {}
                     "
@@ -517,11 +512,7 @@ onMounted(() => {
         </Card>
 
         <!-- Botones finales -->
-        <div class="flex flex-col items-end gap-2 pt-2">
-          <p class="text-xs text-gray-400">
-            Debug: sector={{ formulario.sector_origen_id }}, responsable={{ formulario.responsable_id }}
-          </p>
-          <div class="flex flex-wrap gap-3 justify-end w-full">
+        <div class="flex flex-wrap gap-3 justify-end w-full pt-2">
           <button
             type="button"
             class="px-4 py-2 rounded-lg border border-gray-300 text-gray-600 bg-white hover:bg-gray-50 transition-colors text-sm font-medium"
@@ -540,7 +531,6 @@ onMounted(() => {
               formulario.tema.length < 5 ||
               !formulario.tarea_asignada ||
               formulario.tarea_asignada.length < 10 ||
-              !formulario.responsable_id ||
               enviando
             "
             class="text-sm font-medium"
@@ -550,7 +540,6 @@ onMounted(() => {
               color: white !important;
             "
           />
-          </div>
         </div>
       </form>
     </div>
@@ -570,7 +559,8 @@ onMounted(() => {
   border: 1px solid #e2e8f0 !important;
 }
 
-.nueva-nota :deep(.p-select-overlay) {
+.nueva-nota :deep(.p-select-overlay),
+.nueva-nota :deep(.p-select-list) {
   background-color: white !important;
 }
 
@@ -592,5 +582,28 @@ onMounted(() => {
   color: #1e3a5f !important;
   font-size: 1rem !important;
   font-weight: 600 !important;
+}
+
+/* Fix dropdowns PrimeVue - fondo oscuro */
+.nueva-nota :deep(.p-select-overlay),
+.nueva-nota :deep(.p-select-list),
+.nueva-nota :deep(.p-select-panel) {
+  background-color: white !important;
+  color: #1e293b !important;
+}
+.nueva-nota :deep(.p-select-option) {
+  color: #1e293b !important;
+  background-color: white !important;
+}
+.nueva-nota :deep(.p-select-option:hover),
+.nueva-nota :deep(.p-select-option.p-focus) {
+  background-color: #f1f5f9 !important;
+  color: #1e293b !important;
+}
+.nueva-nota :deep(.p-select-label) {
+  color: #1e293b !important;
+}
+.nueva-nota :deep(.p-placeholder) {
+  color: #94a3b8 !important;
 }
 </style>

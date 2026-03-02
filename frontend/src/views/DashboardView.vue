@@ -67,28 +67,21 @@ async function cargarDashboard() {
         get('/api/notas/?estado=ARCHIVADA'),
       ])
 
-    // En proceso: respuesta paginada
-    const listaEnProceso = Array.isArray(rEnProceso) ? rEnProceso : rEnProceso.results || []
-    enProceso.value = Array.isArray(rEnProceso)
-      ? rEnProceso.length
-      : (rEnProceso.count ?? listaEnProceso.length)
+    // Normalizar siempre a array
+    const toArray = (r) => (Array.isArray(r) ? r : r?.results || [])
 
-    // Atrasadas: array
-    atrasadas.value = Array.isArray(rAtrasadas) ? rAtrasadas.length : 0
+    const listaEnProceso = toArray(rEnProceso)
+    enProceso.value = listaEnProceso.length
 
-    // Pendientes: array, máximo 5 para el panel
-    pendientes.value = Array.isArray(rPendientes) ? rPendientes.slice(0, 5) : []
+    atrasadas.value = toArray(rAtrasadas).length
 
-    // Lista principal: para ingresadas hoy y últimas 5
-    const listaGeneral = Array.isArray(rLista) ? rLista : rLista.results || []
+    pendientes.value = toArray(rPendientes).slice(0, 5)
+
+    const listaGeneral = toArray(rLista)
     ingresadasHoy.value = listaGeneral.filter((n) => esHoy(n.fecha_ingreso)).length
     ultimasIngresadas.value = listaGeneral.slice(0, 5)
 
-    // Resueltas/archivadas este mes (combinar ambas listas y filtrar por mes)
-    const listasResueltas = [
-      ...(Array.isArray(rResueltas) ? rResueltas : rResueltas.results || []),
-      ...(Array.isArray(rArchivadas) ? rArchivadas : rArchivadas.results || []),
-    ]
+    const listasResueltas = [...toArray(rResueltas), ...toArray(rArchivadas)]
     resueltasEsteMes.value = listasResueltas.filter((n) => esDelMesActual(n.fecha_ingreso)).length
   } catch (e) {
     error.value = e.data?.detalle || e.message || 'Error al cargar el panel de control.'
