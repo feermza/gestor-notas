@@ -1,7 +1,13 @@
 <script setup>
+/**
+ * DashboardView — Dashboard diferente por rol.
+ * SUPERVISOR/ADMINISTRADOR: 6 tarjetas + panel "Últimas notas ingresadas"
+ * OPERADOR: 3 tarjetas + panel "Mis notas pendientes"
+ */
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { get } from '@/api/cliente'
+import { useAuthStore } from '@/stores/auth'
 import {
   truncar,
   formatoFecha,
@@ -9,80 +15,122 @@ import {
   colorEstado,
   labelEstado,
   esDelMesActual,
-  esHoy,
 } from '@/utils/notas'
 
 const router = useRouter()
+const auth = useAuthStore()
+
+// Rol del usuario actual
+const rol = computed(() => auth.usuario?.rol ?? null)
+const esSupervisorOAdmin = computed(() =>
+  ['SUPERVISOR', 'ADMINISTRADOR'].includes(rol.value),
+)
+const esOperador = computed(() => rol.value === 'OPERADOR')
 
 // Estado del dashboard
 const cargando = ref(true)
 const error = ref(null)
 
-// Datos de las tarjetas superiores
-const ingresadasHoy = ref(0)
+// Datos para SUPERVISOR/ADMINISTRADOR (6 tarjetas)
+const ingresadas = ref(0)
 const enProceso = ref(0)
+const sinAsignar = ref(0)
 const atrasadas = ref(0)
+const enEspera = ref(0)
 const resueltasEsteMes = ref(0)
-
-// Listas de los paneles inferiores
-const pendientes = ref([])
 const ultimasIngresadas = ref([])
+
+// Datos para OPERADOR (3 tarjetas)
+const misAsignadas = ref(0)
+const misEnProceso = ref(0)
+const misEnEspera = ref(0)
+const pendientes = ref([])
 
 // Fecha actual formateada para el título
 const fechaActual = computed(() => {
   const ahora = new Date()
   const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
   const meses = [
-    'enero',
-    'febrero',
-    'marzo',
-    'abril',
-    'mayo',
-    'junio',
-    'julio',
-    'agosto',
-    'septiembre',
-    'octubre',
-    'noviembre',
-    'diciembre',
+    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
   ]
-  const dia = dias[ahora.getDay()]
-  const numero = ahora.getDate()
-  const mes = meses[ahora.getMonth()]
-  const anio = ahora.getFullYear()
-  return `${dia}, ${numero} de ${mes} de ${anio}`
+  return `${dias[ahora.getDay()]}, ${ahora.getDate()} de ${meses[ahora.getMonth()]} de ${ahora.getFullYear()}`
 })
+
+// Normalizar respuesta API a array
+function toArray(r) {
+  return Array.isArray(r) ? r : r?.results || []
+}
+
+// Ordenar por prioridad: URGENTE, ALTA, NORMAL, BAJA
+const ordenPrioridad = { URGENTE: 0, ALTA: 1, NORMAL: 2, MEDIA: 2, BAJA: 3 }
+function ordenarPorPrioridad(notas) {
+  return [...notas].sort((a, b) => {
+    const pa = ordenPrioridad[a.prioridad] ?? 4
+    const pb = ordenPrioridad[b.prioridad] ?? 4
+    return pa - pb
+  })
+}
+
+async function cargarDashboardSupervisor() {
+  const [rIngresadas, rEnProceso, rAtrasadas, rEnEspera, rLista, rResueltas, rArchivadas] =
+    await Promise.all([
+      get('/api/notas/?estado=INGRESADA'),
+      get('/api/notas/?estado=EN_PROCESO'),
+      get('/api/notas/atrasadas/'),
+      get('/api/notas/?estado=EN_ESPERA'),
+      get('/api/notas/'),
+      get('/api/notas/?estado=RESUELTA'),
+      get('/api/notas/?estado=ARCHIVADA'),
+    ])
+
+  const listaIngresadas = toArray(rIngresadas)
+  ingresadas.value = listaIngresadas.length
+  sinAsignar.value = listaIngresadas.filter((n) => !n.responsable || !n.responsable.id).length
+
+  enProceso.value = toArray(rEnProceso).length
+  atrasadas.value = toArray(rAtrasadas).length
+  enEspera.value = toArray(rEnEspera).length
+
+  const listaGeneral = toArray(rLista)
+  ultimasIngresadas.value = listaGeneral.slice(0, 5)
+
+  const listasResueltas = [...toArray(rResueltas), ...toArray(rArchivadas)]
+  resueltasEsteMes.value = listasResueltas.filter((n) => esDelMesActual(n.fecha_ingreso)).length
+}
+
+async function cargarDashboardOperador() {
+  const [rPendientes, rAsignadas, rEnProceso, rEnEspera] = await Promise.all([
+    get('/api/notas/pendientes/'),
+    get('/api/notas/?estado=ASIGNADA'),
+    get('/api/notas/?estado=EN_PROCESO'),
+    get('/api/notas/?estado=EN_ESPERA'),
+  ])
+
+  const userId = auth.usuario?.id
+  const esMia = (n) => n.responsable?.id === userId || n.responsable === userId
+
+  misAsignadas.value = toArray(rAsignadas).filter(esMia).length
+  misEnProceso.value = toArray(rEnProceso).filter(esMia).length
+  misEnEspera.value = toArray(rEnEspera).filter(esMia).length
+
+  const todasPendientes = ordenarPorPrioridad(toArray(rPendientes))
+  pendientes.value = todasPendientes.slice(0, 5)
+}
 
 async function cargarDashboard() {
   cargando.value = true
   error.value = null
   try {
-    const [rEnProceso, rAtrasadas, rPendientes, rLista, rResueltas, rArchivadas] =
-      await Promise.all([
-        get('/api/notas/?estado=EN_PROCESO'),
-        get('/api/notas/atrasadas/'),
-        get('/api/notas/pendientes/'),
-        get('/api/notas/'),
-        get('/api/notas/?estado=RESUELTA'),
-        get('/api/notas/?estado=ARCHIVADA'),
-      ])
-
-    // Normalizar siempre a array
-    const toArray = (r) => (Array.isArray(r) ? r : r?.results || [])
-
-    const listaEnProceso = toArray(rEnProceso)
-    enProceso.value = listaEnProceso.length
-
-    atrasadas.value = toArray(rAtrasadas).length
-
-    pendientes.value = toArray(rPendientes).slice(0, 5)
-
-    const listaGeneral = toArray(rLista)
-    ingresadasHoy.value = listaGeneral.filter((n) => esHoy(n.fecha_ingreso)).length
-    ultimasIngresadas.value = listaGeneral.slice(0, 5)
-
-    const listasResueltas = [...toArray(rResueltas), ...toArray(rArchivadas)]
-    resueltasEsteMes.value = listasResueltas.filter((n) => esDelMesActual(n.fecha_ingreso)).length
+    if (esSupervisorOAdmin.value) {
+      await cargarDashboardSupervisor()
+    } else if (esOperador.value) {
+      await cargarDashboardOperador()
+    } else {
+      // CONSULTOR u otro: dashboard mínimo (solo últimas ingresadas)
+      const rLista = await get('/api/notas/')
+      ultimasIngresadas.value = toArray(rLista).slice(0, 5)
+    }
   } catch (e) {
     error.value = e.data?.detalle || e.message || 'Error al cargar el panel de control.'
   } finally {
@@ -92,6 +140,19 @@ async function cargarDashboard() {
 
 function irA(ruta) {
   router.push(ruta)
+}
+
+// Tarjeta reutilizable con estilos
+const TARJETA_COLORES = {
+  INGRESADAS: '#475569',
+  EN_PROCESO: '#1d4ed8',
+  SIN_ASIGNAR: '#e11d48',
+  ATRASADAS: '#e11d48',
+  EN_ESPERA: '#d97706',
+  RESUELTAS: '#059669',
+  MIS_ASIGNADAS: '#6366f1',
+  MIS_EN_PROCESO: '#1d4ed8',
+  MIS_EN_ESPERA: '#d97706',
 }
 
 onMounted(cargarDashboard)
@@ -114,223 +175,366 @@ onMounted(cargarDashboard)
         {{ error }}
       </div>
 
-      <!-- Tarjetas superiores: grid 4 cols desktop, 2 tablet -->
-      <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <!-- Skeleton mientras carga -->
-        <template v-if="cargando">
-          <Card v-for="i in 4" :key="'sk-' + i" class="!shadow-sm">
-            <template #content>
-              <div class="flex items-center gap-3">
-                <Skeleton shape="circle" size="3rem" />
-                <div class="flex-1">
-                  <Skeleton width="8rem" height="1rem" class="mb-2" />
-                  <Skeleton width="4rem" height="1.75rem" />
+      <!-- ========== DASHBOARD SUPERVISOR / ADMINISTRADOR ========== -->
+      <template v-if="esSupervisorOAdmin">
+        <!-- 6 tarjetas superiores -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+          <template v-if="cargando">
+            <Card v-for="i in 6" :key="'sk-' + i" class="!shadow-sm">
+              <template #content>
+                <div class="flex items-center gap-3">
+                  <Skeleton shape="circle" size="3rem" />
+                  <div class="flex-1">
+                    <Skeleton width="6rem" height="1rem" class="mb-2" />
+                    <Skeleton width="3rem" height="1.75rem" />
+                  </div>
                 </div>
-              </div>
+              </template>
+            </Card>
+          </template>
+          <template v-else>
+            <!-- 1. INGRESADAS -->
+            <div
+              class="rounded-lg shadow-sm overflow-hidden border-l-4 hover:shadow-md transition-shadow cursor-pointer"
+              style="border-left-color: #475569"
+              @click="router.push('/notas?estado=INGRESADA')"
+            >
+              <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
+                <template #content>
+                  <div class="flex items-center gap-3">
+                    <i class="pi pi-inbox text-2xl" style="color: #475569" />
+                    <div>
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Ingresadas</p>
+                      <p class="text-2xl font-bold text-gray-900">{{ ingresadas }}</p>
+                    </div>
+                  </div>
+                </template>
+              </Card>
+            </div>
+            <!-- 2. EN PROCESO -->
+            <div
+              class="rounded-lg shadow-sm overflow-hidden border-l-4 hover:shadow-md transition-shadow cursor-pointer"
+              style="border-left-color: #1d4ed8"
+              @click="router.push('/notas?estado=EN_PROCESO')"
+            >
+              <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
+                <template #content>
+                  <div class="flex items-center gap-3">
+                    <i class="pi pi-spinner pi-spin text-2xl" style="color: #1d4ed8" />
+                    <div>
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">En proceso</p>
+                      <p class="text-2xl font-bold text-gray-900">{{ enProceso }}</p>
+                    </div>
+                  </div>
+                </template>
+              </Card>
+            </div>
+            <!-- 3. SIN ASIGNAR -->
+            <div
+              class="rounded-lg shadow-sm overflow-hidden border-l-4 hover:shadow-md transition-shadow cursor-pointer"
+              style="border-left-color: #e11d48"
+              @click="router.push('/notas?sin_asignar=true')"
+            >
+              <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
+                <template #content>
+                  <div class="flex items-center gap-3">
+                    <i class="pi pi-user-minus text-2xl" style="color: #e11d48" />
+                    <div>
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Sin asignar</p>
+                      <p class="text-2xl font-bold" :class="sinAsignar > 0 ? 'text-[#e11d48]' : 'text-gray-900'">
+                        {{ sinAsignar }}
+                      </p>
+                    </div>
+                  </div>
+                </template>
+              </Card>
+            </div>
+            <!-- 4. ATRASADAS -->
+            <div
+              class="rounded-lg shadow-sm overflow-hidden border-l-4 hover:shadow-md transition-shadow cursor-pointer"
+              style="border-left-color: #e11d48"
+              @click="router.push('/notas?atrasadas=true')"
+            >
+              <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
+                <template #content>
+                  <div class="flex items-center gap-3">
+                    <i class="pi pi-exclamation-triangle text-2xl" style="color: #e11d48" />
+                    <div>
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Atrasadas</p>
+                      <p class="text-2xl font-bold" :class="atrasadas > 0 ? 'text-[#e11d48]' : 'text-gray-900'">
+                        {{ atrasadas }}
+                      </p>
+                    </div>
+                  </div>
+                </template>
+              </Card>
+            </div>
+            <!-- 5. EN ESPERA -->
+            <div
+              class="rounded-lg shadow-sm overflow-hidden border-l-4 hover:shadow-md transition-shadow cursor-pointer"
+              style="border-left-color: #d97706"
+              @click="router.push('/notas?estado=EN_ESPERA')"
+            >
+              <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
+                <template #content>
+                  <div class="flex items-center gap-3">
+                    <i class="pi pi-clock text-2xl" style="color: #d97706" />
+                    <div>
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">En espera</p>
+                      <p class="text-2xl font-bold text-gray-900">{{ enEspera }}</p>
+                    </div>
+                  </div>
+                </template>
+              </Card>
+            </div>
+            <!-- 6. RESUELTAS ESTE MES -->
+            <div
+              class="rounded-lg shadow-sm overflow-hidden border-l-4 hover:shadow-md transition-shadow cursor-pointer"
+              style="border-left-color: #059669"
+              @click="router.push('/notas?estado=RESUELTA')"
+            >
+              <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
+                <template #content>
+                  <div class="flex items-center gap-3">
+                    <i class="pi pi-check-circle text-2xl" style="color: #059669" />
+                    <div>
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Resueltas este mes</p>
+                      <p class="text-2xl font-bold text-gray-900">{{ resueltasEsteMes }}</p>
+                    </div>
+                  </div>
+                </template>
+              </Card>
+            </div>
+          </template>
+        </section>
+
+        <!-- Panel inferior: Últimas notas ingresadas -->
+        <section class="grid grid-cols-1">
+          <Card class="!bg-white !border !border-gray-200 !shadow-sm">
+            <template #title>
+              <span class="text-lg font-semibold text-[#1e3a5f]">Últimas notas ingresadas</span>
+            </template>
+            <template #content>
+              <template v-if="cargando">
+                <div class="space-y-3">
+                  <Skeleton width="100%" height="2.5rem" v-for="i in 4" :key="i" />
+                </div>
+              </template>
+              <template v-else-if="ultimasIngresadas.length === 0">
+                <div class="py-8 text-center text-gray-500">
+                  <i class="pi pi-inbox text-4xl mb-2 block opacity-60" />
+                  <p>No hay notas ingresadas</p>
+                </div>
+              </template>
+              <template v-else>
+                <ul class="space-y-3">
+                  <li
+                    v-for="nota in ultimasIngresadas"
+                    :key="nota.id"
+                    class="flex flex-wrap items-center gap-2 py-2 border-b border-gray-100 last:border-0"
+                  >
+                    <span class="font-mono text-sm text-gray-700">{{ nota.numero_nota_interno || nota.numero_nota }}</span>
+                    <span class="text-gray-800 flex-1 min-w-0" :title="nota.tema">{{ truncar(nota.tema, 40) }}</span>
+                    <Tag
+                      :value="labelEstado(nota.estado)"
+                      :style="{ background: colorEstado(nota.estado), color: 'white', border: 'none' }"
+                      class="!text-xs"
+                    />
+                    <span class="text-sm text-gray-500">{{ haceCuanto(nota.fecha_ingreso) }}</span>
+                  </li>
+                </ul>
+                <div class="mt-4 pt-3 border-t border-gray-100">
+                  <Button
+                    label="Ver todas"
+                    link
+                    size="small"
+                    class="p-0 text-[#1e3a5f] font-medium"
+                    @click="irA('/notas')"
+                  />
+                </div>
+              </template>
             </template>
           </Card>
-        </template>
+        </section>
+      </template>
 
-        <!-- Tarjetas reales -->
-        <template v-else>
-          <!-- 1. Ingresadas hoy -->
-          <div
-            class="rounded-lg shadow-sm overflow-hidden border-l-4"
-            style="border-left-color: #2d6a9f"
-          >
-            <Card class="!shadow-none !border-0 !rounded-none" style="background-color: #f8fafc">
+      <!-- ========== DASHBOARD OPERADOR ========== -->
+      <template v-else-if="esOperador">
+        <!-- 3 tarjetas superiores -->
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <template v-if="cargando">
+            <Card v-for="i in 3" :key="'sk-' + i" class="!shadow-sm">
               <template #content>
                 <div class="flex items-center gap-3">
-                  <i class="pi pi-inbox text-2xl" style="color: #2d6a9f" />
-                  <div>
-                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">
-                      Ingresadas hoy
-                    </p>
-                    <p class="text-2xl font-bold text-gray-900">{{ ingresadasHoy }}</p>
+                  <Skeleton shape="circle" size="3rem" />
+                  <div class="flex-1">
+                    <Skeleton width="8rem" height="1rem" class="mb-2" />
+                    <Skeleton width="4rem" height="1.75rem" />
                   </div>
                 </div>
               </template>
             </Card>
-          </div>
-
-          <!-- 2. En proceso -->
-          <div
-            class="rounded-lg shadow-sm overflow-hidden border-l-4"
-            style="border-left-color: #f59e0b"
-          >
-            <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
-              <template #content>
-                <div class="flex items-center gap-3">
-                  <i class="pi pi-spinner pi-spin text-2xl" style="color: #f59e0b" />
-                  <div>
-                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">
-                      En proceso
-                    </p>
-                    <p class="text-2xl font-bold text-gray-900">{{ enProceso }}</p>
-                  </div>
-                </div>
-              </template>
-            </Card>
-          </div>
-
-          <!-- 3. Atrasadas -->
-          <div
-            class="rounded-lg shadow-sm overflow-hidden border-l-4"
-            style="border-left-color: #e74c3c"
-          >
-            <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
-              <template #content>
-                <div class="flex items-center gap-3">
-                  <i class="pi pi-exclamation-triangle text-2xl" style="color: #e74c3c" />
-                  <div>
-                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">
-                      Atrasadas
-                    </p>
-                    <p
-                      class="text-2xl font-bold"
-                      :class="atrasadas > 0 ? 'text-[#e74c3c]' : 'text-gray-900'"
-                    >
-                      {{ atrasadas }}
-                    </p>
-                  </div>
-                </div>
-              </template>
-            </Card>
-          </div>
-
-          <!-- 4. Resueltas este mes -->
-          <div
-            class="rounded-lg shadow-sm overflow-hidden border-l-4"
-            style="border-left-color: #27ae60"
-          >
-            <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
-              <template #content>
-                <div class="flex items-center gap-3">
-                  <i class="pi pi-check-circle text-2xl" style="color: #27ae60" />
-                  <div>
-                    <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">
-                      Resueltas este mes
-                    </p>
-                    <p class="text-2xl font-bold text-gray-900">{{ resueltasEsteMes }}</p>
-                  </div>
-                </div>
-              </template>
-            </Card>
-          </div>
-        </template>
-      </section>
-
-      <!-- Paneles inferiores: 2 columnas desktop, 1 móvil -->
-      <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Panel izquierdo: Mis notas pendientes -->
-        <Card class="!bg-white !border !border-gray-200 !shadow-sm">
-          <template #title>
-            <span class="text-lg font-semibold text-[#1e3a5f]">Mis notas pendientes</span>
           </template>
-          <template #content>
-            <template v-if="cargando">
-              <div class="space-y-3">
-                <Skeleton width="100%" height="2.5rem" v-for="i in 4" :key="i" />
-              </div>
+          <template v-else>
+            <!-- 1. MIS ASIGNADAS -->
+            <div
+              class="rounded-lg shadow-sm overflow-hidden border-l-4 hover:shadow-md transition-shadow cursor-pointer"
+              style="border-left-color: #6366f1"
+              @click="router.push('/mi-trabajo?estado=ASIGNADA')"
+            >
+              <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
+                <template #content>
+                  <div class="flex items-center gap-3">
+                    <i class="pi pi-inbox text-2xl" style="color: #6366f1" />
+                    <div>
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Mis asignadas</p>
+                      <p class="text-2xl font-bold text-gray-900">{{ misAsignadas }}</p>
+                    </div>
+                  </div>
+                </template>
+              </Card>
+            </div>
+            <!-- 2. MIS EN PROCESO -->
+            <div
+              class="rounded-lg shadow-sm overflow-hidden border-l-4 hover:shadow-md transition-shadow cursor-pointer"
+              style="border-left-color: #1d4ed8"
+              @click="router.push('/mi-trabajo?estado=EN_PROCESO')"
+            >
+              <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
+                <template #content>
+                  <div class="flex items-center gap-3">
+                    <i class="pi pi-spinner pi-spin text-2xl" style="color: #1d4ed8" />
+                    <div>
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Mis en proceso</p>
+                      <p class="text-2xl font-bold text-gray-900">{{ misEnProceso }}</p>
+                    </div>
+                  </div>
+                </template>
+              </Card>
+            </div>
+            <!-- 3. MIS EN ESPERA -->
+            <div
+              class="rounded-lg shadow-sm overflow-hidden border-l-4 hover:shadow-md transition-shadow cursor-pointer"
+              style="border-left-color: #d97706"
+              @click="router.push('/mi-trabajo?estado=EN_ESPERA')"
+            >
+              <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
+                <template #content>
+                  <div class="flex items-center gap-3">
+                    <i class="pi pi-clock text-2xl" style="color: #d97706" />
+                    <div>
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Mis en espera</p>
+                      <p class="text-2xl font-bold text-gray-900">{{ misEnEspera }}</p>
+                    </div>
+                  </div>
+                </template>
+              </Card>
+            </div>
+          </template>
+        </section>
+
+        <!-- Panel inferior: Mis notas pendientes -->
+        <section class="grid grid-cols-1">
+          <Card class="!bg-white !border !border-gray-200 !shadow-sm">
+            <template #title>
+              <span class="text-lg font-semibold text-[#1e3a5f]">Mis notas pendientes</span>
             </template>
-            <template v-else-if="pendientes.length === 0">
-              <div class="py-8 text-center text-gray-500">
-                <i class="pi pi-inbox text-4xl mb-2 block opacity-60" />
-                <p>No tenés notas pendientes</p>
-              </div>
-            </template>
-            <template v-else>
-              <ul class="space-y-3">
-                <li
-                  v-for="nota in pendientes"
-                  :key="nota.id"
-                  class="flex flex-wrap items-center gap-2 py-2 border-b border-gray-100 last:border-0"
-                >
-                  <span class="font-mono text-sm text-gray-700">{{
-                    nota.numero_nota_interno
-                  }}</span>
-                  <span class="text-gray-800 flex-1 min-w-0" :title="nota.tema">{{
-                    truncar(nota.tema, 40)
-                  }}</span>
-                  <Tag
-                    :value="labelEstado(nota.estado)"
-                    :style="{
-                      background: colorEstado(nota.estado),
-                      color: 'white',
-                      border: 'none',
-                    }"
-                    class="!text-xs"
-                  />
-                  <span
-                    v-if="nota.fecha_limite"
-                    class="text-sm"
-                    :class="nota.atrasada ? 'text-red-600 font-medium' : 'text-gray-500'"
+            <template #content>
+              <template v-if="cargando">
+                <div class="space-y-3">
+                  <Skeleton width="100%" height="2.5rem" v-for="i in 4" :key="i" />
+                </div>
+              </template>
+              <template v-else-if="pendientes.length === 0">
+                <div class="py-8 text-center text-gray-500">
+                  <i class="pi pi-inbox text-4xl mb-2 block opacity-60" />
+                  <p>No tenés notas pendientes</p>
+                </div>
+              </template>
+              <template v-else>
+                <ul class="space-y-3">
+                  <li
+                    v-for="nota in pendientes"
+                    :key="nota.id"
+                    class="flex flex-wrap items-center gap-2 py-2 border-b border-gray-100 last:border-0"
                   >
-                    {{ formatoFecha(nota.fecha_limite) }}
-                    <Badge v-if="nota.atrasada" value="Atrasada" severity="danger" class="ml-1" />
-                  </span>
-                </li>
-              </ul>
-              <div class="mt-4 pt-3 border-t border-gray-100">
-                <Button
-                  label="Ver todas"
-                  link
-                  size="small"
-                  class="p-0 text-[#1e3a5f] font-medium"
-                  @click="irA('/notas/pendientes')"
-                />
-              </div>
+                    <span class="font-mono text-sm text-gray-700">{{ nota.numero_nota_interno || nota.numero_nota }}</span>
+                    <span class="text-gray-800 flex-1 min-w-0" :title="nota.tema">{{ truncar(nota.tema, 40) }}</span>
+                    <Tag
+                      :value="labelEstado(nota.estado)"
+                      :style="{ background: colorEstado(nota.estado), color: 'white', border: 'none' }"
+                      class="!text-xs"
+                    />
+                    <span
+                      v-if="nota.fecha_limite"
+                      class="text-sm"
+                      :class="nota.atrasada ? 'text-red-600 font-medium' : 'text-gray-500'"
+                    >
+                      {{ formatoFecha(nota.fecha_limite) }}
+                      <Badge v-if="nota.atrasada" value="Atrasada" severity="danger" class="ml-1" />
+                    </span>
+                  </li>
+                </ul>
+                <div class="mt-4 pt-3 border-t border-gray-100">
+                  <Button
+                    label="Ver todo"
+                    link
+                    size="small"
+                    class="p-0 text-[#1e3a5f] font-medium"
+                    @click="irA('/mi-trabajo')"
+                  />
+                </div>
+              </template>
             </template>
-          </template>
-        </Card>
+          </Card>
+        </section>
+      </template>
 
-        <!-- Panel derecho: Últimas notas ingresadas -->
-        <Card class="!bg-white !border !border-gray-200 !shadow-sm">
-          <template #title>
-            <span class="text-lg font-semibold text-[#1e3a5f]">Últimas notas ingresadas</span>
-          </template>
-          <template #content>
-            <template v-if="cargando">
-              <div class="space-y-3">
-                <Skeleton width="100%" height="2.5rem" v-for="i in 4" :key="i" />
-              </div>
+      <!-- ========== CONSULTOR u otro rol ========== -->
+      <template v-else>
+        <section class="grid grid-cols-1">
+          <Card class="!bg-white !border !border-gray-200 !shadow-sm">
+            <template #title>
+              <span class="text-lg font-semibold text-[#1e3a5f]">Últimas notas ingresadas</span>
             </template>
-            <template v-else-if="ultimasIngresadas.length === 0">
-              <div class="py-8 text-center text-gray-500">
-                <i class="pi pi-inbox text-4xl mb-2 block opacity-60" />
-                <p>No hay notas ingresadas</p>
-              </div>
+            <template #content>
+              <template v-if="cargando">
+                <div class="space-y-3">
+                  <Skeleton width="100%" height="2.5rem" v-for="i in 4" :key="i" />
+                </div>
+              </template>
+              <template v-else-if="ultimasIngresadas.length === 0">
+                <div class="py-8 text-center text-gray-500">
+                  <i class="pi pi-inbox text-4xl mb-2 block opacity-60" />
+                  <p>No hay notas ingresadas</p>
+                </div>
+              </template>
+              <template v-else>
+                <ul class="space-y-3">
+                  <li
+                    v-for="nota in ultimasIngresadas"
+                    :key="nota.id"
+                    class="flex flex-wrap items-center gap-2 py-2 border-b border-gray-100 last:border-0"
+                  >
+                    <span class="font-mono text-sm text-gray-700">{{ nota.numero_nota_interno || nota.numero_nota }}</span>
+                    <span class="text-gray-800 flex-1 min-w-0" :title="nota.tema">{{ truncar(nota.tema, 40) }}</span>
+                    <span class="text-sm text-gray-500">{{ haceCuanto(nota.fecha_ingreso) }}</span>
+                  </li>
+                </ul>
+                <div class="mt-4 pt-3 border-t border-gray-100">
+                  <Button
+                    label="Ver todas"
+                    link
+                    size="small"
+                    class="p-0 text-[#1e3a5f] font-medium"
+                    @click="irA('/notas')"
+                  />
+                </div>
+              </template>
             </template>
-            <template v-else>
-              <ul class="space-y-3">
-                <li
-                  v-for="nota in ultimasIngresadas"
-                  :key="nota.id"
-                  class="flex flex-wrap items-center gap-2 py-2 border-b border-gray-100 last:border-0"
-                >
-                  <span class="font-mono text-sm text-gray-700">{{
-                    nota.numero_nota_interno
-                  }}</span>
-                  <span class="text-gray-800 flex-1 min-w-0" :title="nota.tema">{{
-                    truncar(nota.tema, 40)
-                  }}</span>
-                  <span class="text-sm text-gray-500">—</span>
-                  <span class="text-sm text-gray-500">{{ haceCuanto(nota.fecha_ingreso) }}</span>
-                </li>
-              </ul>
-              <div class="mt-4 pt-3 border-t border-gray-100">
-                <Button
-                  label="Ver todas"
-                  link
-                  size="small"
-                  class="p-0 text-[#1e3a5f] font-medium"
-                  @click="irA('/notas')"
-                />
-              </div>
-            </template>
-          </template>
-        </Card>
-      </section>
+          </Card>
+        </section>
+      </template>
     </div>
   </div>
 </template>

@@ -1,7 +1,14 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+/**
+ * NotasView — Vista unificada con query params.
+ * Lee estado, atrasadas, sin_asignar al montar y preactiva filtros.
+ * Título dinámico según filtro activo.
+ * Botón "Nueva Nota" visible para ADMINISTRADOR, SUPERVISOR, OPERADOR (no CONSULTOR).
+ */
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { get } from '@/api/cliente'
+import { useAuthStore } from '@/stores/auth'
 import {
   truncar,
   formatoFecha,
@@ -15,6 +22,8 @@ import {
 } from '@/utils/notas'
 
 const router = useRouter()
+const route = useRoute()
+const auth = useAuthStore()
 
 // Estado de carga y error
 const cargando = ref(true)
@@ -25,6 +34,13 @@ const notas = ref([])
 const textoBusqueda = ref('')
 const filtroEstado = ref(null)
 const filtroPrioridad = ref(null)
+const soloAtrasadas = ref(false)
+const sinAsignar = ref(false)
+
+// Botón "Nueva Nota": visible para ADMINISTRADOR, SUPERVISOR, OPERADOR
+const puedeCrearNota = computed(() =>
+  ['ADMINISTRADOR', 'SUPERVISOR', 'OPERADOR'].includes(auth.usuario?.rol),
+)
 
 // Opciones para dropdowns (estados y prioridades)
 const opcionesEstado = computed(() => {
@@ -34,16 +50,17 @@ const opcionesPrioridad = computed(() => {
   return Object.entries(LABELS_PRIORIDAD).map(([value, label]) => ({ value, label }))
 })
 
-// Notas filtradas (búsqueda por numero_nota_interno, tema, remitente)
+// Notas filtradas
 const notasFiltradas = computed(() => {
   let lista = notas.value
 
-  // Búsqueda por texto
+  // Búsqueda por texto (número, tema, remitente)
   const texto = (textoBusqueda.value || '').trim().toLowerCase()
   if (texto) {
     lista = lista.filter(
       (n) =>
         (n.numero_nota || '').toLowerCase().includes(texto) ||
+        (n.numero_nota_interno || '').toLowerCase().includes(texto) ||
         (n.tema || '').toLowerCase().includes(texto) ||
         (n.remitente || '').toLowerCase().includes(texto),
     )
@@ -55,17 +72,38 @@ const notasFiltradas = computed(() => {
   if (filtroPrioridad.value) {
     lista = lista.filter((n) => n.prioridad === filtroPrioridad.value)
   }
+  if (soloAtrasadas.value) {
+    lista = lista.filter((n) => n.atrasada ?? esAtrasada(n))
+  }
+  // Sin asignar: solo notas sin responsable
+  if (sinAsignar.value) {
+    lista = lista.filter((n) => !n.responsable || !n.responsable.id)
+  }
 
   return lista
 })
 
-// Contador total para el título
+// Contador total
 const totalNotas = computed(() => notasFiltradas.value.length)
+
+// Título dinámico según filtro activo
+const tituloVista = computed(() => {
+  const n = totalNotas.value
+  if (sinAsignar.value) return `Sin Asignar (${n})`
+  if (soloAtrasadas.value) return `Notas Atrasadas (${n})`
+  if (filtroEstado.value === 'INGRESADA') return `Notas Ingresadas (${n})`
+  if (filtroEstado.value === 'EN_PROCESO') return `Notas en Proceso (${n})`
+  if (filtroEstado.value === 'EN_ESPERA') return `Notas en Espera (${n})`
+  if (filtroEstado.value === 'RESUELTA') return `Notas Resueltas (${n})`
+  return `Notas (${n})`
+})
 
 function limpiarFiltros() {
   textoBusqueda.value = ''
   filtroEstado.value = null
   filtroPrioridad.value = null
+  soloAtrasadas.value = false
+  sinAsignar.value = false
 }
 
 async function cargarNotas() {
@@ -73,13 +111,20 @@ async function cargarNotas() {
   error.value = null
   try {
     const res = await get('/api/notas/')
-    // La API puede devolver array o objeto paginado { results: [...] }
     notas.value = Array.isArray(res) ? res : res.results || []
   } catch (e) {
     error.value = e.data?.detalle || e.data?.error || e.message || 'Error al cargar las notas.'
   } finally {
     cargando.value = false
   }
+}
+
+// Aplicar query params a los filtros (para navegación programática)
+function aplicarQueryParams() {
+  const q = route.query
+  if (q.estado) filtroEstado.value = q.estado
+  if (q.atrasadas === 'true') soloAtrasadas.value = true
+  if (q.sin_asignar === 'true') sinAsignar.value = true
 }
 
 function irADetalle(id) {
@@ -101,15 +146,25 @@ function claseFila(nota) {
   return atrasada ? 'fila-atrasada' : ''
 }
 
-onMounted(cargarNotas)
+onMounted(() => {
+  aplicarQueryParams()
+  cargarNotas()
+})
+
+// Si cambian los query params (ej. navegación desde dashboard), reaplicar filtros
+watch(
+  () => route.query,
+  () => aplicarQueryParams(),
+  { deep: true },
+)
 </script>
 
 <template>
   <div class="notas-view min-h-full" style="background-color: #eef2f7">
     <div class="p-4 md:p-6">
-      <!-- Título con contador -->
+      <!-- Título dinámico con contador -->
       <header class="mb-6">
-        <h1 class="text-2xl md:text-3xl font-bold text-[#1e3a5f]">Notas ({{ totalNotas }})</h1>
+        <h1 class="text-2xl md:text-3xl font-bold text-[#1e3a5f]">{{ tituloVista }}</h1>
       </header>
 
       <!-- Mensaje de error -->
@@ -124,6 +179,7 @@ onMounted(cargarNotas)
       <!-- Barra de herramientas -->
       <div class="mb-4 flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-center">
         <Button
+          v-if="puedeCrearNota"
           label="Nueva Nota"
           icon="pi pi-plus"
           @click="irANueva"
@@ -176,7 +232,7 @@ onMounted(cargarNotas)
         <ProgressBar mode="indeterminate" style="height: 4px" />
       </div>
 
-      <!-- Tabla de notas (solo cuando no está cargando) -->
+      <!-- Tabla de notas -->
       <div v-if="!cargando" class="card rounded-xl overflow-hidden shadow-md">
         <DataTable
           :value="notasFiltradas"
@@ -191,7 +247,6 @@ onMounted(cargarNotas)
           class="p-datatable-sm"
           current-page-report-template="Mostrando {first} a {last} de {totalRecords} notas"
         >
-          <!-- Columna Número (clickeable) -->
           <Column field="numero_nota" header="Número" sortable>
             <template #body="{ data }">
               <button
@@ -199,12 +254,10 @@ onMounted(cargarNotas)
                 class="font-mono text-sm text-[#1e3a5f] hover:underline cursor-pointer bg-transparent border-none p-0"
                 @click="irADetalle(data.id)"
               >
-                {{ data.numero_nota || '—' }}
+                {{ data.numero_nota || data.numero_nota_interno || '—' }}
               </button>
             </template>
           </Column>
-
-          <!-- Columna Tema (truncado 50 chars + tooltip) -->
           <Column field="tema" header="Tema">
             <template #body="{ data }">
               <span v-tooltip.top="data.tema || '—'" class="block truncate max-w-[200px]">
@@ -212,15 +265,11 @@ onMounted(cargarNotas)
               </span>
             </template>
           </Column>
-
-          <!-- Columna Remitente -->
           <Column field="remitente" header="Remitente">
             <template #body="{ data }">
               {{ data.remitente || '—' }}
             </template>
           </Column>
-
-          <!-- Columna Estado (Tag con color) -->
           <Column field="estado" header="Estado">
             <template #body="{ data }">
               <Tag
@@ -234,8 +283,6 @@ onMounted(cargarNotas)
               />
             </template>
           </Column>
-
-          <!-- Columna Prioridad (COLORES_PRIORIDAD; URGENTE con pulso) -->
           <Column field="prioridad" header="Prioridad">
             <template #body="{ data }">
               <Tag
@@ -250,8 +297,6 @@ onMounted(cargarNotas)
               />
             </template>
           </Column>
-
-          <!-- Columna Responsable -->
           <Column header="Responsable">
             <template #body="{ data }">
               <span :class="data.responsable ? 'text-gray-800' : 'text-gray-400'">
@@ -259,8 +304,6 @@ onMounted(cargarNotas)
               </span>
             </template>
           </Column>
-
-          <!-- Columna Fecha límite (en rojo si atrasada) -->
           <Column field="fecha_limite" header="Fecha límite">
             <template #body="{ data }">
               <span
@@ -272,8 +315,6 @@ onMounted(cargarNotas)
               </span>
             </template>
           </Column>
-
-          <!-- Columna Acciones (botón ojo) -->
           <Column header="Acciones" class="acciones-col">
             <template #body="{ data }">
               <Button
@@ -287,8 +328,6 @@ onMounted(cargarNotas)
               />
             </template>
           </Column>
-
-          <!-- Template vacío cuando no hay datos -->
           <template #empty>
             <div class="py-8 text-center text-gray-500">
               <i class="pi pi-inbox text-4xl mb-2 block opacity-60" />
@@ -297,7 +336,6 @@ onMounted(cargarNotas)
           </template>
         </DataTable>
 
-        <!-- Botón recarga manual -->
         <div class="p-3 border-t border-gray-100 flex justify-end">
           <button
             type="button"
@@ -374,8 +412,15 @@ onMounted(cargarNotas)
   animation: pulso 1.5s ease-in-out infinite;
 }
 
-/* Responsive: en móvil la tabla usa layout apilado */
 .notas-view :deep(.p-datatable .p-datatable-tbody > tr > td) {
   word-break: break-word;
+}
+
+/* Fix dropdown Estado y Prioridad */
+.notas-view :deep(.p-select-label) {
+  color: #1e293b !important;
+}
+.notas-view :deep(.p-placeholder) {
+  color: #94a3b8 !important;
 }
 </style>

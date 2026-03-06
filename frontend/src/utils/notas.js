@@ -40,7 +40,6 @@ export const COLORES_PRIORIDAD = {
 export const LABELS_PRIORIDAD = {
   BAJA: 'Baja',
   NORMAL: 'Normal',
-  MEDIA: 'Normal', // API devuelve MEDIA
   ALTA: 'Alta',
   URGENTE: 'Urgente',
 }

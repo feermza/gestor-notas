@@ -70,7 +70,6 @@ const esSupervisorOAdmin = computed(() =>
 const esResponsable = computed(() => {
   const idUsuario = Number(usuarioActual.value?.id)
   const idResponsable = Number(nota.value?.responsable?.id)
-  console.log('DEBUG:', { idUsuario, idResponsable })
   return idUsuario === idResponsable
 })
 
@@ -269,6 +268,39 @@ function archivar() {
   ejecutarCambioEstado({ estado_nuevo: 'ARCHIVADA' })
 }
 
+// Autoasignarse: solo SUPERVISOR/ADMIN cuando INGRESADA sin responsable o ASIGNADA a otro
+const puedeAutoasignarse = computed(() => {
+  if (!esSupervisorOAdmin.value || !nota.value) return false
+  if (nota.value.estado === 'INGRESADA') {
+    const sinResponsable = !nota.value.responsable || !nota.value.responsable.id
+    return !!sinResponsable
+  }
+  if (nota.value.estado === 'ASIGNADA') return !esResponsable.value
+  return false
+})
+
+async function autoasignarse() {
+  if (!usuarioActual.value?.id) return
+  enviandoAccion.value = true
+  try {
+    await post(`/api/notas/${notaId.value}/cambiar_estado/`, {
+      estado_nuevo: 'ASIGNADA',
+      responsable_nuevo: usuarioActual.value.id,
+    })
+    toast.add({
+      severity: 'success',
+      summary: 'Asignación realizada',
+      detail: 'Te asignaste la nota correctamente.',
+    })
+    await cargarNota()
+  } catch (e) {
+    const msg = e.data?.detalle || e.data?.error || e.message || 'Error al autoasignarse.'
+    toast.add({ severity: 'error', summary: 'Error', detail: msg })
+  } finally {
+    enviandoAccion.value = false
+  }
+}
+
 onMounted(() => {
   Promise.all([cargarNota(), cargarSectores(), cargarUsuarios()])
 })
@@ -324,9 +356,9 @@ watch(notaId, (nuevo) => {
 
       <!-- Contenido en dos columnas -->
       <div v-if="!cargando && nota" class="grid grid-cols-1 lg:grid-cols-10 gap-6">
-        <!-- Columna principal (70%) -->
+        <!-- Columna principal (70%) — 4 cards verticales -->
         <div class="lg:col-span-7 space-y-6">
-          <!-- Card 1 — Identificación -->
+          <!-- Card 1: Identificación -->
           <Card>
             <template #title>Identificación</template>
             <template #content>
@@ -353,7 +385,7 @@ watch(notaId, (nuevo) => {
             </template>
           </Card>
 
-          <!-- Card 2 — Contenido -->
+          <!-- Card 2: Contenido -->
           <Card>
             <template #title>Contenido</template>
             <template #content>
@@ -372,41 +404,7 @@ watch(notaId, (nuevo) => {
             </template>
           </Card>
 
-          <!-- Card 3 — Historial -->
-          <Card>
-            <template #title>Historial</template>
-            <template #content>
-              <div class="space-y-0">
-                <div
-                  v-for="(ev, index) in historialOrdenado"
-                  :key="ev.id"
-                  class="flex gap-4 py-3 border-b border-gray-100 last:border-0"
-                >
-                  <div
-                    class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-                    :style="{
-                      backgroundColor: colorIconoEvento(ev.tipo_evento) + '20',
-                      color: colorIconoEvento(ev.tipo_evento),
-                    }"
-                  >
-                    <i :class="['pi', iconoEvento(ev.tipo_evento)]" class="text-sm" />
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-xs text-gray-500">{{ formatoFechaHora(ev.fecha_hora) }}</p>
-                    <p class="text-sm font-medium text-gray-800">{{ ev.usuario || 'Sistema' }}</p>
-                    <p class="text-sm text-gray-600">
-                      {{ ev.descripcion_cambio || ev.tipo_evento }}
-                    </p>
-                  </div>
-                </div>
-                <p v-if="!historialOrdenado.length" class="text-gray-500 text-sm py-2">
-                  Sin registros en el historial.
-                </p>
-              </div>
-            </template>
-          </Card>
-
-          <!-- Card 4 — Adjuntos -->
+          <!-- Card 3: Adjuntos -->
           <Card>
             <template #title>Adjuntos</template>
             <template #content>
@@ -447,6 +445,40 @@ watch(notaId, (nuevo) => {
                 severity="secondary"
                 @click="() => {}"
               />
+            </template>
+          </Card>
+
+          <!-- Card 4: Historial -->
+          <Card>
+            <template #title>Historial</template>
+            <template #content>
+              <div class="space-y-0">
+                <div
+                  v-for="(ev, index) in historialOrdenado"
+                  :key="ev.id"
+                  class="flex gap-4 py-3 border-b border-gray-100 last:border-0"
+                >
+                  <div
+                    class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                    :style="{
+                      backgroundColor: colorIconoEvento(ev.tipo_evento) + '20',
+                      color: colorIconoEvento(ev.tipo_evento),
+                    }"
+                  >
+                    <i :class="['pi', iconoEvento(ev.tipo_evento)]" class="text-sm" />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-xs text-gray-500">{{ formatoFechaHora(ev.fecha_hora) }}</p>
+                    <p class="text-sm font-medium text-gray-800">{{ ev.usuario || 'Sistema' }}</p>
+                    <p class="text-sm text-gray-600">
+                      {{ ev.descripcion_cambio || ev.tipo_evento }}
+                    </p>
+                  </div>
+                </div>
+                <p v-if="!historialOrdenado.length" class="text-gray-500 text-sm py-2">
+                  Sin registros en el historial.
+                </p>
+              </div>
             </template>
           </Card>
         </div>
@@ -508,6 +540,15 @@ watch(notaId, (nuevo) => {
                 <template v-if="nota.estado === 'INGRESADA'">
                   <template v-if="esSupervisorOAdmin">
                     <button
+                      v-if="puedeAutoasignarse"
+                      type="button"
+                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#0891b2] hover:bg-[#0e7490] transition-colors"
+                      :disabled="enviandoAccion"
+                      @click="autoasignarse"
+                    >
+                      Autoasignarse
+                    </button>
+                    <button
                       type="button"
                       class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#1e3a5f] hover:bg-[#2d4f7c] transition-colors"
                       :disabled="enviandoAccion"
@@ -536,6 +577,15 @@ watch(notaId, (nuevo) => {
 
                 <!-- ASIGNADA: responsable → Iniciar proceso; supervisor → Reasignar, Archivar, Devolver -->
                 <template v-if="nota.estado === 'ASIGNADA'">
+                  <button
+                    v-if="puedeAutoasignarse"
+                    type="button"
+                    class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#0891b2] hover:bg-[#0e7490] transition-colors"
+                    :disabled="enviandoAccion"
+                    @click="autoasignarse"
+                  >
+                    Autoasignarse
+                  </button>
                   <button
                     v-if="esResponsable"
                     type="button"

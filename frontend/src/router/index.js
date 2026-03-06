@@ -33,6 +33,13 @@ const router = createRouter({
           name: 'dashboard',
           component: DashboardView,
         },
+        // Mi Trabajo (OPERADOR)
+        {
+          path: 'mi-trabajo',
+          name: 'mi-trabajo',
+          component: () => import('@/views/MiTrabajoView.vue'),
+          meta: { requiresAuth: true },
+        },
         // Listado de notas
         {
           path: 'notas',
@@ -53,7 +60,7 @@ const router = createRouter({
         {
           path: 'notas/pendientes',
           name: 'notas-pendientes',
-          component: () => import('@/views/DashboardView.vue'),
+          component: () => import('@/views/PendientesView.vue'),
         },
         {
           path: 'notas/atrasadas',

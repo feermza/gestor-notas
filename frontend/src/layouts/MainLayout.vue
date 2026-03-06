@@ -1,40 +1,82 @@
 <script setup>
-import { ref, computed } from 'vue'
+/**
+ * MainLayout — Menú lateral por rol.
+ * SUPERVISOR/ADMINISTRADOR: Inicio, Notas, Sin asignar (si hay), Administración (solo ADMIN)
+ * OPERADOR: Inicio, Mi Trabajo, Notas
+ * CONSULTOR: Inicio, Notas
+ */
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { get } from '@/api/cliente'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
 const sidebarVisible = ref(false)
-const menuItems = computed(() => {
-  const items = [
-    { label: 'Inicio', icon: 'pi pi-home', to: '/' },
-    { label: 'Notas', icon: 'pi pi-list', to: '/notas' },
-    { label: 'Pendientes', icon: 'pi pi-clock', to: '/notas/pendientes' },
-  ]
-  // Solo roles con permiso ven "Atrasadas"
-  if (
-    auth.usuario?.rol &&
-    ['ADMIN', 'DIRECTOR', 'JEFE', 'SOLO_LECTURA'].includes(auth.usuario.rol)
-  ) {
-    items.push({ label: 'Atrasadas', icon: 'pi pi-exclamation-triangle', to: '/notas/atrasadas' })
+
+// Solo para SUPERVISOR/ADMIN: si hay notas INGRESADA sin responsable, mostrar "Sin asignar"
+const hayNotasSinAsignar = ref(false)
+
+async function cargarNotasSinAsignar() {
+  if (!auth.usuario || !['SUPERVISOR', 'ADMINISTRADOR'].includes(auth.usuario.rol)) return
+  try {
+    const res = await get('/api/notas/?estado=INGRESADA')
+    const lista = Array.isArray(res) ? res : res?.results || []
+    hayNotasSinAsignar.value = lista.some((n) => !n.responsable || !n.responsable.id)
+  } catch {
+    hayNotasSinAsignar.value = false
   }
-  return items.map((item) => ({
-    ...item,
-    command: () => router.push(item.to),
-  }))
+}
+
+const menuItems = computed(() => {
+  const rol = auth.usuario?.rol
+  const items = []
+
+  // Todos los roles ven Inicio
+  items.push({ label: 'Inicio', icon: 'pi pi-home', to: '/' })
+
+  // SUPERVISOR / ADMINISTRADOR
+  if (rol === 'SUPERVISOR' || rol === 'ADMINISTRADOR') {
+    items.push({ label: 'Notas', icon: 'pi pi-list', to: '/notas' })
+    // Sin asignar: visible solo si hay notas sin asignar
+    if (hayNotasSinAsignar.value) {
+      items.push({ label: 'Sin asignar', icon: 'pi pi-inbox', to: '/notas?estado=INGRESADA' })
+    }
+    // Administración: solo ADMINISTRADOR
+    if (rol === 'ADMINISTRADOR') {
+      items.push({ label: 'Administración', icon: 'pi pi-cog', to: '/admin' })
+    }
+    return items
+  }
+
+  // OPERADOR
+  if (rol === 'OPERADOR') {
+    items.push({ label: 'Mi Trabajo', icon: 'pi pi-briefcase', to: '/mi-trabajo' })
+    items.push({ label: 'Notas', icon: 'pi pi-list', to: '/notas' })
+    return items
+  }
+
+  // CONSULTOR (y cualquier otro rol por defecto)
+  items.push({ label: 'Notas', icon: 'pi pi-list', to: '/notas' })
+  return items
 })
 
-function irA(ruta) {
-  router.push(ruta)
+// Clase activa: comparar fullPath para links con query
+function esActivo(item) {
+  if (route.fullPath === item.to) return true
+  // Para /notas sin query, considerar activo si path es /notas
+  if (item.to === '/notas' && route.path === '/notas' && !route.query.estado && !route.query.atrasadas && !route.query.sin_asignar) return true
+  return false
 }
 
 async function cerrarSesion() {
   await auth.logout()
   router.push('/login')
 }
+
+onMounted(cargarNotasSinAsignar)
 </script>
 
 <template>
@@ -87,7 +129,7 @@ async function cerrarSesion() {
             :key="item.to"
             :to="item.to"
             class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100"
-            :class="route.path === item.to ? 'bg-primario/10 font-medium' : ''"
+            :class="esActivo(item) ? 'bg-primario/10 font-medium' : ''"
             style="--color-primario: var(--color-primario)"
             @click="sidebarVisible = false"
           >
@@ -111,7 +153,7 @@ async function cerrarSesion() {
             :to="item.to"
             class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors"
             :class="
-              route.path === item.to
+              esActivo(item)
                 ? 'bg-gray-100 font-medium text-primario'
                 : 'text-gray-700 hover:bg-gray-50'
             "
