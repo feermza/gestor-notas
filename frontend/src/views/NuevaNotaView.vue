@@ -17,6 +17,8 @@ const cargandoUsuarios = ref(true)
 // Formulario
 const enviando = ref(false)
 const errorGeneral = ref(null)
+const mensajeExito = ref('')
+const mostrarExito = ref(false)
 
 const form = ref({
   sector_origen_id: null,
@@ -242,16 +244,14 @@ async function guardar() {
       await postFormData(`/api/notas/${notaId}/adjuntos/`, fd)
     }
 
-    toast.add({
-      severity: 'success',
-      summary: 'Nota creada',
-      detail: form.value.responsable_id
-        ? 'Nota creada y asignada correctamente'
-        : 'Nota creada correctamente',
-    })
+    mensajeExito.value = form.value.responsable_id
+      ? 'Nota creada y asignada correctamente'
+      : 'Nota creada correctamente'
+    mostrarExito.value = true
+    await new Promise((r) => setTimeout(r, 1500))
     router.push('/notas')
-  } catch (err) {
-    const data = err.data || {}
+  } catch (error) {
+    const data = error?.response?.data || error?.data || {}
     if (data && typeof data === 'object') {
       for (const [key, value] of Object.entries(data)) {
         const mensaje = Array.isArray(value) ? value[0] : String(value)
@@ -262,7 +262,9 @@ async function guardar() {
         else errores.value[key] = mensaje
       }
     }
-    errorGeneral.value = data.detalle || data.error || err.message || 'Error al guardar la nota.'
+    errorGeneral.value = error?.response?.data?.detail
+      || error?.message
+      || 'Error al guardar la nota'
   } finally {
     enviando.value = false
   }
@@ -285,6 +287,16 @@ onMounted(() => {
         <h1 class="text-2xl md:text-3xl font-bold text-[#1e3a5f]">Nueva nota</h1>
         <p class="text-gray-600 mt-1">Completá los datos de la nota</p>
       </header>
+
+      <Transition name="slide-down">
+        <div
+          v-if="mostrarExito"
+          class="fixed top-4 right-4 z-50 flex items-center gap-3 bg-[#059669] text-white px-5 py-3 rounded-lg shadow-lg"
+        >
+          <i class="pi pi-check-circle text-lg" />
+          <span class="font-medium">{{ mensajeExito }}</span>
+        </div>
+      </Transition>
 
       <form @submit.prevent="guardar" class="space-y-6">
         <!-- Error general -->
@@ -547,6 +559,16 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.3s ease;
+}
+.slide-down-enter-from,
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translateY(-1rem);
+}
+
 .nueva-nota {
   min-height: 100%;
 }

@@ -122,9 +122,16 @@ async function cargarNotas() {
 // Aplicar query params a los filtros (para navegación programática)
 function aplicarQueryParams() {
   const q = route.query
+  // Resetear siempre primero
+  filtroEstado.value = ''
+  soloAtrasadas.value = false
+  sinAsignar.value = false
+  textoBusqueda.value = ''
+  // Luego activar los que correspondan
   if (q.estado) filtroEstado.value = q.estado
   if (q.atrasadas === 'true') soloAtrasadas.value = true
   if (q.sin_asignar === 'true') sinAsignar.value = true
+  if (q.search) textoBusqueda.value = q.search
 }
 
 function irADetalle(id) {
@@ -147,6 +154,9 @@ function claseFila(nota) {
 }
 
 onMounted(() => {
+  // Preactivar buscador si se llegó con ?search= (p. ej. desde búsqueda global del navbar)
+  const searchQuery = route.query.search
+  if (searchQuery) textoBusqueda.value = searchQuery
   aplicarQueryParams()
   cargarNotas()
 })

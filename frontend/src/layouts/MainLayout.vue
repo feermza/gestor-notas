@@ -5,16 +5,76 @@
  * OPERADOR: Inicio, Mi Trabajo, Notas
  * CONSULTOR: Inicio, Notas
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { get } from '@/api/cliente'
+import { COLORES_ESTADO, LABELS_ESTADO } from '@/utils/notas'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
 const sidebarVisible = ref(false)
+
+// Búsqueda global en navbar (solo visible si el usuario está autenticado)
+const busquedaExpandida = ref(false)
+const inputBusqueda = ref(null)
+const busquedaGlobal = ref('')
+const resultados = ref([])
+const mostrarResultados = ref(false)
+const buscando = ref(false)
+let timeoutBusqueda = null
+
+/** Búsqueda con debounce de 300ms contra /api/notas/?search= */
+function onBusqueda() {
+  clearTimeout(timeoutBusqueda)
+  if (busquedaGlobal.value.length < 2) {
+    resultados.value = []
+    mostrarResultados.value = false
+    return
+  }
+  buscando.value = true
+  mostrarResultados.value = true
+  timeoutBusqueda = setTimeout(async () => {
+    try {
+      const res = await get(
+        `/api/notas/?search=${encodeURIComponent(busquedaGlobal.value)}`,
+      )
+      const lista = Array.isArray(res) ? res : res?.results || []
+      resultados.value = lista.slice(0, 5)
+    } catch {
+      resultados.value = []
+    } finally {
+      buscando.value = false
+    }
+  }, 300)
+}
+
+function irANota(id) {
+  router.push(`/notas/${id}`)
+  cerrarBusqueda()
+}
+
+function irAResultados() {
+  if (busquedaGlobal.value.length >= 2) {
+    router.push(`/notas?search=${encodeURIComponent(busquedaGlobal.value)}`)
+    cerrarBusqueda()
+  }
+}
+
+/** Colapsar el buscador, limpiar texto y resultados */
+function cerrarBusqueda() {
+  busquedaExpandida.value = false
+  busquedaGlobal.value = ''
+  mostrarResultados.value = false
+  resultados.value = []
+}
+
+// Focus automático en el input cuando se expande
+watch(busquedaExpandida, (val) => {
+  if (val) nextTick(() => inputBusqueda.value?.focus())
+})
 
 // Solo para SUPERVISOR/ADMIN: si hay notas INGRESADA sin responsable, mostrar "Sin asignar"
 const hayNotasSinAsignar = ref(false)
@@ -76,7 +136,15 @@ async function cerrarSesion() {
   router.push('/login')
 }
 
-onMounted(cargarNotasSinAsignar)
+onMounted(() => {
+  cargarNotasSinAsignar()
+  // Cerrar y colapsar búsqueda al hacer click fuera
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.busqueda-global')) {
+      cerrarBusqueda()
+    }
+  })
+})
 </script>
 
 <template>
@@ -97,6 +165,100 @@ onMounted(cargarNotasSinAsignar)
         />
         <span class="font-semibold text-lg">Gestor de Notas - RRHH</span>
       </div>
+
+      <!-- Barra de búsqueda global colapsable (solo visible si el usuario está autenticado) -->
+      <div v-if="auth.usuario" class="busqueda-global relative flex items-center">
+        <!-- Ícono lupa siempre visible -->
+        <button
+          type="button"
+          class="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+          aria-label="Buscar nota"
+          @click="busquedaExpandida = !busquedaExpandida"
+        >
+          <i class="pi pi-search text-sm" />
+        </button>
+
+        <!-- Input expandible con transición -->
+        <transition
+          enter-active-class="transition-all duration-200 ease-out"
+          enter-from-class="w-0 opacity-0"
+          enter-to-class="w-64 opacity-100"
+          leave-active-class="transition-all duration-200 ease-in"
+          leave-from-class="w-64 opacity-100"
+          leave-to-class="w-0 opacity-0"
+        >
+          <div
+            v-if="busquedaExpandida"
+            class="relative overflow-hidden"
+          >
+            <i
+              class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 z-10 text-sm"
+            />
+            <input
+              ref="inputBusqueda"
+              v-model="busquedaGlobal"
+              type="text"
+              placeholder="Buscar nota..."
+              class="w-64 pl-9 pr-4 py-1.5 rounded-lg text-sm bg-white/10 text-white placeholder-gray-300 border border-white/20 focus:outline-none focus:bg-white/20 transition-all"
+              @input="onBusqueda"
+              @keydown.enter="irAResultados"
+              @keydown.escape="cerrarBusqueda"
+            />
+          </div>
+        </transition>
+
+        <!-- Dropdown de resultados rápidos -->
+        <div
+          v-if="mostrarResultados && resultados.length > 0"
+          class="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-80 overflow-y-auto"
+        >
+          <div
+            v-for="nota in resultados"
+            :key="nota.id"
+            class="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0"
+            @click="irANota(nota.id)"
+          >
+            <div>
+              <p class="font-mono text-xs text-[#1e3a5f] font-bold">
+                {{ nota.numero_nota }}
+              </p>
+              <p class="text-sm text-gray-700 truncate max-w-xs">
+                {{ nota.tema }}
+              </p>
+            </div>
+            <span
+              class="px-2 py-0.5 rounded-full text-xs text-white ml-2 shrink-0"
+              :style="{ backgroundColor: COLORES_ESTADO[nota.estado] }"
+            >
+              {{ LABELS_ESTADO[nota.estado] }}
+            </span>
+          </div>
+
+          <div
+            v-if="resultados.length === 5"
+            class="px-4 py-2 text-center text-sm text-[#1e3a5f] hover:bg-gray-50 cursor-pointer font-medium"
+            @click="irAResultados"
+          >
+            Ver todos los resultados →
+          </div>
+        </div>
+
+        <!-- Sin resultados -->
+        <div
+          v-if="
+            mostrarResultados &&
+            busquedaGlobal.length >= 2 &&
+            resultados.length === 0 &&
+            !buscando
+          "
+          class="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 px-4 py-3"
+        >
+          <p class="text-sm text-gray-500">
+            No se encontraron notas para "{{ busquedaGlobal }}"
+          </p>
+        </div>
+      </div>
+
       <div class="flex items-center gap-3">
         <span class="text-sm hidden sm:inline">{{
           auth.nombreCompleto || auth.usuario?.username

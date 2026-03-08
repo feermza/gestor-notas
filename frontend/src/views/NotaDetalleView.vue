@@ -2,7 +2,6 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { get, post } from '@/api/cliente'
-import { useToast } from 'primevue/usetoast'
 import { useAuthStore } from '@/stores/auth'
 import {
   formatoFecha,
@@ -15,7 +14,24 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const toast = useToast()
+
+// Toasts personalizados (mejor contraste)
+const mensajeExito = ref('')
+const mostrarExito = ref(false)
+const mensajeError = ref('')
+const mostrarError = ref(false)
+
+function mostrarToastExito(mensaje) {
+  mensajeExito.value = mensaje
+  mostrarExito.value = true
+  setTimeout(() => { mostrarExito.value = false }, 3000)
+}
+
+function mostrarToastError(mensaje) {
+  mensajeError.value = mensaje
+  mostrarError.value = true
+  setTimeout(() => { mostrarError.value = false }, 4000)
+}
 
 // Estado
 const nota = ref(null)
@@ -174,16 +190,12 @@ async function ejecutarCambioEstado(payload) {
   enviandoAccion.value = true
   try {
     await post(`/api/notas/${notaId.value}/cambiar_estado/`, payload)
-    toast.add({
-      severity: 'success',
-      summary: 'Estado actualizado',
-      detail: 'La nota se actualizó correctamente.',
-    })
+    mostrarToastExito('Estado actualizado correctamente')
     await cargarNota()
     cerrarDialogs()
   } catch (e) {
     const msg = e.data?.detalle || e.data?.error || e.message || 'Error al cambiar el estado.'
-    toast.add({ severity: 'error', summary: 'Error', detail: msg })
+    mostrarToastError(msg)
   } finally {
     enviandoAccion.value = false
   }
@@ -208,11 +220,7 @@ function abrirAsignar(tipo) {
 
 function confirmarAsignar() {
   if (!asignarResponsableId.value) {
-    toast.add({
-      severity: 'warn',
-      summary: 'Falta responsable',
-      detail: 'Seleccioná un responsable.',
-    })
+    mostrarToastError('Seleccioná un responsable.')
     return
   }
   const payload = {
@@ -235,11 +243,7 @@ function confirmarMotivo() {
   const motivo = motivoTexto.value?.trim() || ''
   if (!acc) return
   if (motivo.length < 10) {
-    toast.add({
-      severity: 'warn',
-      summary: 'Motivo obligatorio',
-      detail: 'El motivo debe tener al menos 10 caracteres.',
-    })
+    mostrarToastError('El motivo debe tener al menos 10 caracteres.')
     return
   }
   let payload
@@ -287,15 +291,11 @@ async function autoasignarse() {
       estado_nuevo: 'ASIGNADA',
       responsable_nuevo: usuarioActual.value.id,
     })
-    toast.add({
-      severity: 'success',
-      summary: 'Asignación realizada',
-      detail: 'Te asignaste la nota correctamente.',
-    })
+    mostrarToastExito('Estado actualizado correctamente')
     await cargarNota()
   } catch (e) {
     const msg = e.data?.detalle || e.data?.error || e.message || 'Error al autoasignarse.'
-    toast.add({ severity: 'error', summary: 'Error', detail: msg })
+    mostrarToastError(msg)
   } finally {
     enviandoAccion.value = false
   }
@@ -312,6 +312,28 @@ watch(notaId, (nuevo) => {
 
 <template>
   <div class="nota-detalle min-h-full" style="background-color: #eef2f7">
+    <!-- Toast éxito -->
+    <Transition name="slide-down">
+      <div
+        v-if="mostrarExito"
+        class="fixed top-4 right-4 z-50 flex items-center gap-3 bg-[#059669] text-white px-5 py-3 rounded-lg shadow-lg"
+      >
+        <i class="pi pi-check-circle text-lg" />
+        <span class="font-medium">{{ mensajeExito }}</span>
+      </div>
+    </Transition>
+
+    <!-- Toast error -->
+    <Transition name="slide-down">
+      <div
+        v-if="mostrarError"
+        class="fixed top-4 right-4 z-50 flex items-center gap-3 bg-[#dc2626] text-white px-5 py-3 rounded-lg shadow-lg"
+      >
+        <i class="pi pi-times-circle text-lg" />
+        <span class="font-medium">{{ mensajeError }}</span>
+      </div>
+    </Transition>
+
     <div class="p-4 md:p-6 max-w-6xl mx-auto">
       <!-- Header -->
       <header class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -850,6 +872,16 @@ watch(notaId, (nuevo) => {
 </template>
 
 <style scoped>
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.3s ease;
+}
+.slide-down-enter-from,
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translateY(-1rem);
+}
+
 .nota-detalle {
   min-height: 100%;
 }

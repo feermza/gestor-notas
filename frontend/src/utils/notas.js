@@ -53,7 +53,9 @@ export function truncar(texto, max = 40) {
 /** Formato corto de fecha (dd/mm/yyyy) */
 export function formatoFecha(fechaStr) {
   if (!fechaStr) return '—'
-  const d = new Date(fechaStr + 'T12:00:00')
+  // Limpiar microsegundos que algunos navegadores no parsean
+  const fechaLimpia = fechaStr.replace(/(\.\d{3})\d+/, '$1')
+  const d = new Date(fechaLimpia + 'T12:00:00')
   return d.toLocaleDateString('es-AR', {
     day: '2-digit',
     month: '2-digit',
@@ -77,7 +79,10 @@ export function formatoFechaHora(fechaStr) {
 /** "hace X minutos", "hace 2 horas", "ayer", "hace 3 días" */
 export function haceCuanto(fechaStr) {
   if (!fechaStr) return '—'
-  const fecha = new Date(fechaStr)
+  // Limpiar microsegundos que algunos navegadores no parsean
+  const fechaLimpia = fechaStr.replace(/(\.\d{3})\d+/, '$1')
+  const fecha = new Date(fechaLimpia)
+  if (isNaN(fecha.getTime())) return '—'
   const ahora = new Date()
   const diffMs = ahora - fecha
   const diffDias = Math.floor(diffMs / (24 * 60 * 60 * 1000))
