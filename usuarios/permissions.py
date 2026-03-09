@@ -27,6 +27,17 @@ class EsAdmin(BasePermission):
         )
 
 
+class IsAdministrador(BasePermission):
+    """Solo ADMINISTRADOR puede acceder (para ViewSets de gestión)."""
+    message = 'Solo los administradores pueden realizar esta acción.'
+
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated
+            and getattr(request.user, 'rol', None) == 'ADMINISTRADOR'
+        )
+
+
 class EsSupervisor(BasePermission):
     """Usuarios con rol SUPERVISOR."""
     message = 'Se requiere rol Supervisor.'

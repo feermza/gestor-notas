@@ -156,7 +156,7 @@ async function cargarSectores() {
 async function cargarUsuarios() {
   cargandoUsuarios.value = true
   try {
-    const res = await get('/api/usuarios/?activos=true')
+    const res = await get('/api/usuarios/activos/')
     usuarios.value = Array.isArray(res) ? res : res.results || res
   } catch (_err) {
     usuarios.value = []
@@ -262,9 +262,8 @@ async function guardar() {
         else errores.value[key] = mensaje
       }
     }
-    errorGeneral.value = error?.response?.data?.detail
-      || error?.message
-      || 'Error al guardar la nota'
+    errorGeneral.value =
+      error?.response?.data?.detail || error?.message || 'Error al guardar la nota'
   } finally {
     enviando.value = false
   }
@@ -291,7 +290,7 @@ onMounted(() => {
       <Transition name="slide-down">
         <div
           v-if="mostrarExito"
-          class="fixed top-4 right-4 z-50 flex items-center gap-3 bg-[#059669] text-white px-5 py-3 rounded-lg shadow-lg"
+          class="fixed top-4 right-4 z-[9999] flex items-center gap-3 bg-[#059669] text-white px-5 py-3 rounded-lg shadow-lg"
         >
           <i class="pi pi-check-circle text-lg" />
           <span class="font-medium">{{ mensajeExito }}</span>

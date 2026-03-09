@@ -24,13 +24,17 @@ const mostrarError = ref(false)
 function mostrarToastExito(mensaje) {
   mensajeExito.value = mensaje
   mostrarExito.value = true
-  setTimeout(() => { mostrarExito.value = false }, 3000)
+  setTimeout(() => {
+    mostrarExito.value = false
+  }, 3000)
 }
 
 function mostrarToastError(mensaje) {
   mensajeError.value = mensaje
   mostrarError.value = true
-  setTimeout(() => { mostrarError.value = false }, 4000)
+  setTimeout(() => {
+    mostrarError.value = false
+  }, 4000)
 }
 
 // Estado
@@ -174,7 +178,7 @@ async function cargarSectores() {
 
 async function cargarUsuarios() {
   try {
-    const res = await get('/api/usuarios/?activos=true')
+    const res = await get('/api/usuarios/activos/')
     usuarios.value = Array.isArray(res) ? res : res.results || []
   } catch {
     usuarios.value = []
@@ -316,7 +320,7 @@ watch(notaId, (nuevo) => {
     <Transition name="slide-down">
       <div
         v-if="mostrarExito"
-        class="fixed top-4 right-4 z-50 flex items-center gap-3 bg-[#059669] text-white px-5 py-3 rounded-lg shadow-lg"
+        class="fixed top-4 right-4 z-[9999] flex items-center gap-3 bg-[#059669] text-white px-5 py-3 rounded-lg shadow-lg"
       >
         <i class="pi pi-check-circle text-lg" />
         <span class="font-medium">{{ mensajeExito }}</span>
@@ -327,7 +331,7 @@ watch(notaId, (nuevo) => {
     <Transition name="slide-down">
       <div
         v-if="mostrarError"
-        class="fixed top-4 right-4 z-50 flex items-center gap-3 bg-[#dc2626] text-white px-5 py-3 rounded-lg shadow-lg"
+        class="fixed top-4 right-4 z-[9999] flex items-center gap-3 bg-[#dc2626] text-white px-5 py-3 rounded-lg shadow-lg"
       >
         <i class="pi pi-times-circle text-lg" />
         <span class="font-medium">{{ mensajeError }}</span>

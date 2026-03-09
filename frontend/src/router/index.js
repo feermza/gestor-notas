@@ -67,6 +67,12 @@ const router = createRouter({
           name: 'notas-atrasadas',
           component: () => import('@/views/DashboardView.vue'),
         },
+        {
+          path: 'usuarios',
+          name: 'usuarios',
+          component: () => import('@/views/UsuariosView.vue'),
+          meta: { requiresAuth: true, soloAdmin: true },
+        },
       ],
     },
   ],
@@ -95,6 +101,13 @@ router.beforeEach(async (to, from) => {
     // Si después de cargarUsuario() sigue sin haber usuario, redirigir a login
     if (!authStore.usuario) {
       return '/login'
+    }
+  }
+
+  // Ruta solo para ADMINISTRADOR
+  if (to.meta.soloAdmin) {
+    if (authStore.usuario?.rol !== 'ADMINISTRADOR') {
+      return '/'
     }
   }
 

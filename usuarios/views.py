@@ -6,12 +6,14 @@ El login se realiza con legajo en lugar de username.
 from django.contrib.auth import login, logout
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet
 
 from .models import Usuario
-from .permissions import EstaAutenticado
+from .permissions import EstaAutenticado, IsAdministrador
+from .serializers import UsuarioSerializer
 
 
 def _datos_usuario(usuario):
@@ -104,20 +106,67 @@ def perfil_view(request):
 @csrf_exempt
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def usuarios_list_view(request):
+def usuarios_activos_view(request):
     """
-    Vista de listado de usuarios: GET /api/usuarios/
-    Retorna lista de usuarios activos (para dropdowns).
-    
-    Query params:
-        activos=true: filtra solo usuarios activos
+    Listado de usuarios activos para dropdowns (legajo, nombre, etc.).
+    GET /api/usuarios/activos/
     """
-    queryset = Usuario.objects.all()
-    
-    # Filtrar por activos si se solicita
-    activos = request.query_params.get('activos', '').lower() == 'true'
-    if activos:
-        queryset = queryset.filter(is_active=True)
-    
+    queryset = Usuario.objects.filter(is_active=True)
     usuarios_data = [_datos_usuario(u) for u in queryset]
     return Response(usuarios_data, status=status.HTTP_200_OK)
+
+
+class UsuarioViewSet(ModelViewSet):
+    """
+    CRUD de usuarios. Solo ADMINISTRADOR.
+    list: GET /api/usuarios/
+    retrieve: GET /api/usuarios/{id}/
+    create: POST /api/usuarios/
+    update: PUT /api/usuarios/{id}/
+    partial_update: PATCH /api/usuarios/{id}/
+    activar: POST /api/usuarios/{id}/activar/
+    desactivar: POST /api/usuarios/{id}/desactivar/
+    destroy: no implementado (se desactiva en lugar de eliminar).
+    """
+    serializer_class = UsuarioSerializer
+    permission_classes = [IsAdministrador]
+    queryset = Usuario.objects.all().order_by('apellido', 'nombres')
+    http_method_names = ['get', 'post', 'put', 'patch', 'head', 'options']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        activos = self.request.query_params.get('activos', '').lower() == 'true'
+        if activos:
+            qs = qs.filter(is_active=True)
+        return qs
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        password_inicial = f"Rrhh{instance.legajo}!"
+        instance.set_password(password_inicial)
+        instance.save(update_fields=['password'])
+
+    @action(detail=True, methods=['post'], url_path='activar')
+    def activar(self, request, pk=None):
+        usuario = self.get_object()
+        usuario.is_active = True
+        usuario.save(update_fields=['is_active'])
+        return Response({'mensaje': 'Usuario activado.'}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='desactivar')
+    def desactivar(self, request, pk=None):
+        usuario = self.get_object()
+        usuario.is_active = False
+        usuario.save(update_fields=['is_active'])
+        return Response({'mensaje': 'Usuario desactivado.'}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='resetear_password')
+    def resetear_password(self, request, pk=None):
+        usuario = self.get_object()
+        nueva_password = f"Rrhh{usuario.legajo}!"
+        usuario.set_password(nueva_password)
+        usuario.save(update_fields=['password'])
+        return Response(
+            {'mensaje': f'Contraseña reseteada a Rrhh{usuario.legajo}!'},
+            status=status.HTTP_200_OK,
+        )

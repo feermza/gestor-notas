@@ -104,8 +104,9 @@ const menuItems = computed(() => {
     if (hayNotasSinAsignar.value) {
       items.push({ label: 'Sin asignar', icon: 'pi pi-inbox', to: '/notas?estado=INGRESADA' })
     }
-    // Administración: solo ADMINISTRADOR
+    // Usuarios y Administración: solo ADMINISTRADOR
     if (rol === 'ADMINISTRADOR') {
+      items.push({ label: 'Usuarios', icon: 'pi pi-users', to: '/usuarios' })
       items.push({ label: 'Administración', icon: 'pi pi-cog', to: '/admin' })
     }
     return items

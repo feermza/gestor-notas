@@ -23,6 +23,7 @@ import Badge from 'primevue/badge'
 import ProgressBar from 'primevue/progressbar'
 import Skeleton from 'primevue/skeleton'
 import Dropdown from 'primevue/dropdown'
+import InputNumber from 'primevue/inputnumber'
 import Tooltip from 'primevue/tooltip'
 import Calendar from 'primevue/calendar'
 import Textarea from 'primevue/textarea'
@@ -60,6 +61,7 @@ app.component('Badge', Badge)
 app.component('ProgressBar', ProgressBar)
 app.component('Skeleton', Skeleton)
 app.component('Dropdown', Dropdown)
+app.component('InputNumber', InputNumber)
 app.component('Calendar', Calendar)
 app.component('Textarea', Textarea)
 app.component('Checkbox', Checkbox)
