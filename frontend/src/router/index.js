@@ -79,6 +79,12 @@ const router = createRouter({
           component: () => import('@/views/SectoresView.vue'),
           meta: { requiresAuth: true, soloAdmin: true },
         },
+        {
+          path: 'admin',
+          name: 'admin',
+          component: () => import('@/views/AdminView.vue'),
+          meta: { requiresAuth: true, soloAdmin: true },
+        },
       ],
     },
   ],

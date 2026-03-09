@@ -1,5 +1,5 @@
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django.db import transaction
 from django.db.models import Q
@@ -455,3 +455,86 @@ class SectorViewSet(viewsets.ModelViewSet):
         if activos:
             qs = qs.filter(activo=True)
         return qs.order_by('numero')
+
+
+# --- Reportes y auditoría (solo ADMINISTRADOR) ---
+
+@api_view(['GET'])
+@permission_classes([EstaAutenticado, IsAdministrador])
+def reporte_notas_por_sector(request):
+    """
+    GET /api/reportes/notas-por-sector/
+    Devuelve lista de sectores con conteo de notas por estado.
+    """
+    sectores = Sector.objects.filter(activo=True).order_by('numero')
+    resultado = []
+    for sector in sectores:
+        notas = Nota.objects.filter(sector_origen=sector)
+        resultado.append({
+            'sector': sector.nombre,
+            'numero': str(sector.numero),
+            'total': notas.count(),
+            'ingresadas': notas.filter(estado='INGRESADA').count(),
+            'en_proceso': notas.filter(
+                estado__in=['ASIGNADA', 'EN_PROCESO', 'EN_ESPERA']
+            ).count(),
+            'resueltas': notas.filter(
+                estado__in=['RESUELTA', 'ARCHIVADA']
+            ).count(),
+        })
+    return Response(resultado)
+
+
+@api_view(['GET'])
+@permission_classes([EstaAutenticado, IsAdministrador])
+def reporte_notas_por_operador(request):
+    """
+    GET /api/reportes/notas-por-operador/
+    Devuelve lista de operadores con conteo de notas asignadas.
+    """
+    from usuarios.models import Usuario
+
+    operadores = Usuario.objects.filter(
+        rol__in=['OPERADOR', 'SUPERVISOR'],
+        is_active=True,
+    ).order_by('apellido', 'nombres')
+    resultado = []
+    for op in operadores:
+        notas = Nota.objects.filter(responsable=op)
+        resultado.append({
+            'operador': op.nombre_completo,
+            'legajo': op.legajo,
+            'pendientes': notas.filter(estado='ASIGNADA').count(),
+            'en_proceso': notas.filter(
+                estado__in=['EN_PROCESO', 'EN_ESPERA']
+            ).count(),
+            'resueltas': notas.filter(
+                estado__in=['RESUELTA', 'ARCHIVADA']
+            ).count(),
+            'total': notas.count(),
+        })
+    return Response(resultado)
+
+
+@api_view(['GET'])
+@permission_classes([EstaAutenticado, IsAdministrador])
+def auditoria_list(request):
+    """
+    GET /api/auditoria/
+    Devuelve los últimos 100 registros de HistorialNota.
+    """
+    registros = HistorialNota.objects.select_related(
+        'nota', 'usuario'
+    ).order_by('-fecha_hora')[:100]
+    resultado = []
+    for r in registros:
+        resultado.append({
+            'id': r.id,
+            'fecha_hora': r.fecha_hora.isoformat() if r.fecha_hora else None,
+            'usuario': r.usuario.nombre_completo if r.usuario else '—',
+            'nota': r.nota.numero_nota if r.nota else '—',
+            'nota_id': r.nota_id if r.nota_id else None,
+            'tipo_evento': r.tipo_evento or '',
+            'descripcion_cambio': r.descripcion_cambio or '',
+        })
+    return Response(resultado)
