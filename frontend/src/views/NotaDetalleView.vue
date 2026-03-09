@@ -169,7 +169,7 @@ async function cargarNota() {
 
 async function cargarSectores() {
   try {
-    const res = await get('/api/sectores/')
+    const res = await get('/api/sectores/?activos=true')
     sectores.value = Array.isArray(res) ? res : res.results || []
   } catch {
     sectores.value = []
@@ -406,6 +406,15 @@ watch(notaId, (nuevo) => {
                 <div v-if="nota.canal_ingreso">
                   <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Canal de ingreso</p>
                   <p class="text-gray-800">{{ labelCanal(nota.canal_ingreso) }}</p>
+                </div>
+                <div v-if="nota.email_respuesta">
+                  <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">
+                    Email de respuesta
+                  </p>
+                  <p class="text-sm text-gray-800 flex items-center gap-1">
+                    <i class="pi pi-envelope text-xs text-gray-400" />
+                    {{ nota.email_respuesta }}
+                  </p>
                 </div>
               </div>
             </template>

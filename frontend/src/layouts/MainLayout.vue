@@ -107,6 +107,7 @@ const menuItems = computed(() => {
     // Usuarios y Administración: solo ADMINISTRADOR
     if (rol === 'ADMINISTRADOR') {
       items.push({ label: 'Usuarios', icon: 'pi pi-users', to: '/usuarios' })
+      items.push({ label: 'Sectores', icon: 'pi pi-building', to: '/sectores' })
       items.push({ label: 'Administración', icon: 'pi pi-cog', to: '/admin' })
     }
     return items

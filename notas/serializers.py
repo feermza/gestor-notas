@@ -4,10 +4,10 @@ from .models import Nota, HistorialNota, Adjunto, Sector, EstadoChoices
 
 
 class SectorSerializer(serializers.ModelSerializer):
-    """Serializer para listado de sectores (dropdown)."""
+    """Serializer para sectores con todos los campos (listado y CRUD)."""
     class Meta:
         model = Sector
-        fields = ['id', 'nombre', 'numero']
+        fields = ['id', 'nombre', 'numero', 'activo', 'descripcion', 'email']
 
 
 class NotaListSerializer(serializers.ModelSerializer):
@@ -26,6 +26,7 @@ class NotaListSerializer(serializers.ModelSerializer):
             'responsable',
             'fecha_limite',
             'fecha_ingreso',
+            'email_respuesta',
             'atrasada'
         ]
     
@@ -57,6 +58,7 @@ class NotaCreateSerializer(serializers.Serializer):
     numero_nota_externo = serializers.CharField(required=False, allow_blank=True, allow_null=True, default='')
     tiene_numero_formal = serializers.BooleanField(required=False, default=False)
     fecha_ingreso = serializers.DateTimeField(required=False)
+    email_respuesta = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
 
     def create(self, validated_data):
         from usuarios.models import Usuario
@@ -85,6 +87,10 @@ class NotaCreateSerializer(serializers.Serializer):
 
         fecha_ingreso = validated_data.get('fecha_ingreso') or timezone.now()
 
+        email_respuesta = validated_data.get('email_respuesta') or None
+        if email_respuesta and isinstance(email_respuesta, str):
+            email_respuesta = email_respuesta.strip() or None
+
         nota = Nota.objects.create(
             sector_origen=sector,
             responsable=responsable,
@@ -98,6 +104,7 @@ class NotaCreateSerializer(serializers.Serializer):
             tiene_numero_formal=tiene_numero_formal,
             fecha_ingreso=fecha_ingreso,
             numero_nota=numero_nota,
+            email_respuesta=email_respuesta,
         )
         return nota
 
@@ -128,6 +135,7 @@ class NotaDetalleSerializer(serializers.ModelSerializer):
             'tema',
             'tarea_asignada',
             'descripcion',
+            'email_respuesta',
             'prioridad',
             'estado',
             'canal_ingreso',

@@ -27,6 +27,7 @@ const form = ref({
   tarea_asignada: '',
   responsable_id: null,
   prioridad: 'MEDIA', // API usa MEDIA, se muestra como "Normal"
+  email_respuesta: '',
 })
 
 // Alias para usar en el template con el nombre solicitado
@@ -144,7 +145,7 @@ function validar() {
 async function cargarSectores() {
   cargandoSectores.value = true
   try {
-    const res = await get('/api/sectores/')
+    const res = await get('/api/sectores/?activos=true')
     sectores.value = Array.isArray(res) ? res : res.results || res
   } catch (_err) {
     sectores.value = []
@@ -225,6 +226,7 @@ async function guardar() {
       tema,
       tarea_asignada: tarea,
       prioridad: form.value.prioridad || 'MEDIA',
+      email_respuesta: form.value.email_respuesta || null,
     }
     if (form.value.responsable_id != null && form.value.responsable_id !== '') {
       payload.responsable_id = form.value.responsable_id
@@ -521,6 +523,31 @@ onMounted(() => {
             </div>
           </template>
         </Card>
+
+        <!-- SECCIÓN — Contacto de respuesta -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+          <h2 class="text-lg font-semibold text-[#1e3a5f] mb-4">
+            Contacto de respuesta
+          </h2>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Email de respuesta
+              <span class="text-gray-400 font-normal">(opcional)</span>
+            </label>
+            <input
+              v-model="form.email_respuesta"
+              type="email"
+              placeholder="Si la respuesta debe enviarse a alguien específico..."
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
+                     focus:outline-none focus:border-[#1e3a5f] bg-white
+                     text-gray-800 placeholder-gray-400"
+            />
+            <p class="text-xs text-gray-400 mt-1">
+              Si se completa, la resolución se enviará a este email.
+              Si se deja vacío, se usará el email del sector de origen.
+            </p>
+          </div>
+        </div>
 
         <!-- Botones finales -->
         <div class="flex flex-wrap gap-3 justify-end w-full pt-2">

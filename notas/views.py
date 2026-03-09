@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404
 from usuarios.permissions import (
     EstaAutenticado,
     EsDirectorJefeOAdmin,
+    IsAdministrador,
     PuedeCrearNota,
     PuedeVerNotas,
     PuedeAnularNota,
@@ -428,11 +429,29 @@ class AdjuntoViewSet(viewsets.ModelViewSet):
         )
 
 
-class SectorViewSet(viewsets.ReadOnlyModelViewSet):
+class SectorViewSet(viewsets.ModelViewSet):
     """
-    ViewSet de solo lectura para sectores.
-    list: devuelve todos los sectores activos ordenados por nombre.
+    ViewSet para gestionar sectores.
+    list: GET /api/sectores/ — listar sectores (todos o solo activos con ?activos=true)
+    retrieve: GET /api/sectores/{id}/
+    create: POST /api/sectores/ — solo ADMINISTRADOR
+    update: PUT /api/sectores/{id}/ — solo ADMINISTRADOR
+    partial_update: PATCH /api/sectores/{id}/ — solo ADMINISTRADOR
+    destroy: no implementado
     """
-    queryset = Sector.objects.filter(activo=True).order_by('nombre')
     serializer_class = SectorSerializer
-    permission_classes = [EstaAutenticado]
+    http_method_names = ['get', 'post', 'put', 'patch', 'head', 'options']
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [EstaAutenticado()]
+        if self.action in ('create', 'update', 'partial_update'):
+            return [EstaAutenticado(), IsAdministrador()]
+        return [EstaAutenticado()]
+
+    def get_queryset(self):
+        qs = Sector.objects.all().order_by('numero')
+        activos = self.request.query_params.get('activos', '').lower() == 'true'
+        if activos:
+            qs = qs.filter(activo=True)
+        return qs.order_by('numero')

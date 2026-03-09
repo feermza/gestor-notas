@@ -16,6 +16,7 @@ class Sector(models.Model):
     )
     activo = models.BooleanField(default=True, verbose_name='Activo')
     descripcion = models.TextField(blank=True, verbose_name='Descripción')
+    email = models.EmailField(blank=True, verbose_name='Email')
 
     class Meta:
         verbose_name = 'Sector'
@@ -184,6 +185,11 @@ class Nota(models.Model):
         blank=True,
         verbose_name='Descripción',
         help_text='Descripción detallada del contenido de la nota'
+    )
+    email_respuesta = models.EmailField(
+        blank=True,
+        null=True,
+        verbose_name='Email de respuesta'
     )
     prioridad = models.CharField(
         max_length=10,

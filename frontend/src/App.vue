@@ -53,4 +53,15 @@
   background-color: #cbd5e1 !important;
   border-top: 2px solid #94a3b8 !important;
 }
+
+textarea,
+.p-textarea {
+  background-color: #f8fafc !important;
+  color: #1e293b !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+textarea::placeholder {
+  color: #94a3b8 !important;
+}
 </style>
