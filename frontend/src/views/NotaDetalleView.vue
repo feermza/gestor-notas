@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { get, post } from '@/api/cliente'
+import { get, post, postFormData } from '@/api/cliente'
 import { useAuthStore } from '@/stores/auth'
 import {
   formatoFecha,
@@ -44,6 +44,8 @@ const usuarios = ref([])
 const cargando = ref(true)
 const error = ref(null)
 const enviandoAccion = ref(false)
+const inputArchivo = ref(null)
+const subiendoAdjunto = ref(false)
 
 // Dialogs
 const dialogAsignar = ref(false)
@@ -182,6 +184,31 @@ async function cargarUsuarios() {
     usuarios.value = Array.isArray(res) ? res : res.results || []
   } catch {
     usuarios.value = []
+  }
+}
+
+async function subirAdjunto(event) {
+  const archivo = event.target.files[0]
+  if (!archivo) return
+
+  subiendoAdjunto.value = true
+  try {
+    const formData = new FormData()
+    formData.append('archivo', archivo)
+    formData.append('nombre_archivo', archivo.name)
+    formData.append('tipo_adjunto', 'DOCUMENTO_ORIGINAL')
+
+    await postFormData(`/api/notas/${nota.value.id}/adjuntos/`, formData)
+
+    mostrarToastExito('Adjunto subido correctamente')
+    await cargarNota()
+  } catch (error) {
+    mostrarToastError(
+      error?.data?.detail || error?.data?.detalle || error?.message || 'Error al subir el adjunto',
+    )
+  } finally {
+    subiendoAdjunto.value = false
+    event.target.value = ''
   }
 }
 
@@ -443,6 +470,13 @@ watch(notaId, (nuevo) => {
           <Card>
             <template #title>Adjuntos</template>
             <template #content>
+              <input
+                ref="inputArchivo"
+                type="file"
+                class="hidden"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                @change="subirAdjunto"
+              />
               <ul class="space-y-2">
                 <li
                   v-for="adj in nota.adjuntos || []"
@@ -459,27 +493,33 @@ watch(notaId, (nuevo) => {
                       {{ formatoFechaHora(adj.fecha_subida) }}
                     </p>
                   </div>
-                  <Button
-                    icon="pi pi-download"
-                    text
-                    rounded
-                    size="small"
-                    v-tooltip.top="'Descargar'"
-                    @click="() => {}"
-                  />
+                  <div class="flex items-center gap-1">
+                    <!-- Ver archivo -->
+                    <a
+                      v-if="adj?.url"
+                      :href="adj.url"
+                      target="_blank"
+                      v-tooltip.top="'Ver'"
+                      class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[#1e3a5f] hover:bg-gray-100 transition-colors cursor-pointer"
+                    >
+                      <i class="pi pi-eye text-sm" />
+                    </a>
+                    <!-- Descargar archivo -->
+                    <a
+                      v-if="adj?.url"
+                      :href="adj.url"
+                      :download="adj.nombre_archivo"
+                      v-tooltip.top="'Descargar'"
+                      class="inline-flex items-center justify-center w-8 h-8 rounded-full text-[#1e3a5f] hover:bg-gray-100 transition-colors cursor-pointer"
+                    >
+                      <i class="pi pi-download text-sm" />
+                    </a>
+                  </div>
                 </li>
               </ul>
               <p v-if="!nota.adjuntos?.length" class="text-gray-500 text-sm py-2">
                 No hay adjuntos.
               </p>
-              <Button
-                v-if="esSupervisorOAdmin || esResponsable"
-                label="Agregar adjunto"
-                icon="pi pi-paperclip"
-                class="mt-2"
-                severity="secondary"
-                @click="() => {}"
-              />
             </template>
           </Card>
 

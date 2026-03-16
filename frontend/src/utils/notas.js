@@ -53,9 +53,9 @@ export function truncar(texto, max = 40) {
 /** Formato corto de fecha (dd/mm/yyyy) */
 export function formatoFecha(fechaStr) {
   if (!fechaStr) return '—'
-  // Limpiar microsegundos que algunos navegadores no parsean
   const fechaLimpia = fechaStr.replace(/(\.\d{3})\d+/, '$1')
-  const d = new Date(fechaLimpia + 'T12:00:00')
+  const d = new Date(fechaLimpia)
+  if (isNaN(d.getTime())) return '—'
   return d.toLocaleDateString('es-AR', {
     day: '2-digit',
     month: '2-digit',
@@ -66,7 +66,9 @@ export function formatoFecha(fechaStr) {
 /** Formato fecha y hora (dd/mm/yyyy HH:MM) */
 export function formatoFechaHora(fechaStr) {
   if (!fechaStr) return '—'
-  const d = new Date(fechaStr)
+  const fechaLimpia = fechaStr.replace(/(\.\d{3})\d+/, '$1')
+  const d = new Date(fechaLimpia)
+  if (isNaN(d.getTime())) return '—'
   return d.toLocaleString('es-AR', {
     day: '2-digit',
     month: '2-digit',
@@ -123,7 +125,9 @@ export function esAtrasada(nota) {
 /** Devuelve true si fecha_ingreso está en el mes actual */
 export function esDelMesActual(fechaStr) {
   if (!fechaStr) return false
-  const d = new Date(fechaStr + 'T12:00:00')
+  const fechaLimpia = fechaStr.replace(/(\.\d{3})\d+/, '$1')
+  const d = new Date(fechaLimpia)
+  if (isNaN(d.getTime())) return false
   const hoy = new Date()
   return d.getFullYear() === hoy.getFullYear() && d.getMonth() === hoy.getMonth()
 }

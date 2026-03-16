@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from django.utils import timezone
+from django.conf import settings
 from .models import Nota, HistorialNota, Adjunto, Sector, EstadoChoices
+import os
 
 
 class SectorSerializer(serializers.ModelSerializer):
@@ -267,6 +269,7 @@ class AdjuntoSerializer(serializers.ModelSerializer):
     subido_por = serializers.StringRelatedField(read_only=True)
     archivo = serializers.FileField(write_only=True, required=False)
     tamaño_formateado = serializers.SerializerMethodField()
+    url = serializers.SerializerMethodField()
     
     class Meta:
         model = Adjunto
@@ -276,6 +279,7 @@ class AdjuntoSerializer(serializers.ModelSerializer):
             'nombre_archivo',
             'tipo_adjunto',
             'ruta_almacenamiento',
+            'url',
             'tipo_mime',
             'tamaño_bytes',
             'subido_por',
@@ -290,21 +294,44 @@ class AdjuntoSerializer(serializers.ModelSerializer):
             'fecha_subida',
             'subido_por'
         ]
+
+    def get_url(self, obj):
+        """Construye la URL completa del archivo."""
+        if not obj.ruta_almacenamiento:
+            return None
+        return f"http://localhost:8000/media/{obj.ruta_almacenamiento}"
     
     def get_tamaño_formateado(self, obj):
         """Retorna el tamaño formateado del archivo."""
         return obj.tamaño_formateado()
 
     def create(self, validated_data):
-        """Rellena ruta_almacenamiento, tipo_mime y tamaño_bytes desde el archivo si existe."""
+        """Guarda el archivo en disco y rellena los campos correspondientes."""
         archivo = validated_data.pop('archivo', None)
-        nombre = validated_data.get('nombre_archivo', '') or 'sin_nombre'
-        validated_data['ruta_almacenamiento'] = nombre[:500]
-        validated_data['tipo_mime'] = 'application/octet-stream'
-        validated_data['tamaño_bytes'] = 0
+    
         if archivo:
-            validated_data['tamaño_bytes'] = getattr(archivo, 'size', 0) or 0
-            ct = getattr(archivo, 'content_type', None)
-            if ct:
-                validated_data['tipo_mime'] = ct[:100]
+            # Crear carpeta media si no existe
+            media_root = settings.MEDIA_ROOT
+            os.makedirs(media_root, exist_ok=True)
+        
+            # Guardar archivo en disco
+            nombre_archivo = archivo.name
+            ruta_completa = os.path.join(media_root, nombre_archivo)
+        
+            with open(ruta_completa, 'wb+') as destino:
+                for chunk in archivo.chunks():
+                    destino.write(chunk)
+        
+            validated_data['ruta_almacenamiento'] = nombre_archivo
+            validated_data['nombre_archivo'] = nombre_archivo
+            validated_data['tamaño_bytes'] = archivo.size or 0
+            validated_data['tipo_mime'] = getattr(
+                archivo, 'content_type', 'application/octet-stream'
+            ) or 'application/octet-stream'
+        else:
+            nombre = validated_data.get('nombre_archivo', 'sin_nombre')
+            validated_data['ruta_almacenamiento'] = nombre[:500]
+            validated_data['tamaño_bytes'] = 0
+            validated_data['tipo_mime'] = 'application/octet-stream'
+        
         return super().create(validated_data)
