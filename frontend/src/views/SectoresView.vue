@@ -379,56 +379,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: all 0.3s ease;
-}
-.slide-down-enter-from,
-.slide-down-leave-to {
-  opacity: 0;
-  transform: translateY(-1rem);
-}
-
 .sectores-view {
   min-height: 100%;
-}
-
-.sectores-view :deep(.p-datatable) {
-  background-color: white !important;
-}
-.sectores-view :deep(.p-datatable-table) {
-  background-color: white !important;
-}
-.sectores-view :deep(.p-datatable-thead > tr > th) {
-  background-color: #f8fafc !important;
-  color: #1e293b !important;
-  border-bottom: 2px solid #e2e8f0 !important;
-}
-.sectores-view :deep(.p-datatable-tbody > tr) {
-  background-color: white !important;
-  color: #1e293b !important;
-}
-.sectores-view :deep(.p-datatable-tbody > tr:hover) {
-  background-color: #f1f5f9 !important;
-}
-.sectores-view :deep(.p-paginator) {
-  background-color: white !important;
-  color: #1e293b !important;
-  border-top: 1px solid #e2e8f0 !important;
-}
-.sectores-view :deep(.p-inputtext),
-.sectores-view :deep(.p-inputnumber-input),
-.sectores-view :deep(.p-textarea) {
-  background-color: #f8fafc !important;
-  color: #1e293b !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-/* Inputs nativos dentro del modal */
-.sectores-view :deep(.p-dialog) input,
-.sectores-view :deep(.p-dialog) textarea {
-  background-color: #f8fafc !important;
-  color: #1e293b !important;
-  border: 1px solid #e2e8f0 !important;
 }
 </style>

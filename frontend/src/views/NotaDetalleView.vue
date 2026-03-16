@@ -70,6 +70,9 @@ const usuariosParaAsignar = computed(() =>
 
 const notaId = computed(() => route.params.id)
 
+// Origen de navegación para el botón "Volver" (?desde= mi-trabajo | notas | sin-asignar)
+const origenNavegacion = ref('notas')
+
 // Sector de origen (la API puede devolver id; resolvemos con lista de sectores)
 const sectorOrigenDisplay = computed(() => {
   if (!nota.value) return '—'
@@ -212,9 +215,21 @@ async function subirAdjunto(event) {
   }
 }
 
-function volverANotas() {
-  router.push('/notas')
+function volver() {
+  if (origenNavegacion.value === 'mi-trabajo') {
+    router.push('/mi-trabajo')
+  } else if (origenNavegacion.value === 'sin-asignar') {
+    router.push('/notas?estado=INGRESADA')
+  } else {
+    router.push('/notas')
+  }
 }
+
+const labelVolver = computed(() => {
+  if (origenNavegacion.value === 'mi-trabajo') return 'Mi Trabajo'
+  if (origenNavegacion.value === 'sin-asignar') return '← Volver a Sin Asignar'
+  return '← Volver a Notas'
+})
 
 // Cambio de estado
 async function ejecutarCambioEstado(payload) {
@@ -333,12 +348,20 @@ async function autoasignarse() {
 }
 
 onMounted(() => {
+  origenNavegacion.value = route.query.desde || 'notas'
   Promise.all([cargarNota(), cargarSectores(), cargarUsuarios()])
 })
 
 watch(notaId, (nuevo) => {
   if (nuevo) cargarNota()
 })
+
+watch(
+  () => route.query.desde,
+  (desde) => {
+    origenNavegacion.value = desde || 'notas'
+  },
+)
 </script>
 
 <template>
@@ -367,29 +390,32 @@ watch(notaId, (nuevo) => {
 
     <div class="p-4 md:p-6 max-w-6xl mx-auto">
       <!-- Header -->
-      <header class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div class="flex flex-wrap items-center gap-3">
-          <Button
-            label="Volver a Notas"
-            icon="pi pi-arrow-left"
-            text
-            class="p-0 text-[#1e3a5f] font-medium"
-            @click="volverANotas"
+      <header class="mb-6">
+        <!-- Back navigation -->
+        <div class="mb-3">
+          <button
+            @click="volver"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-slate-600 bg-slate-100 border border-slate-200 hover:bg-slate-200 hover:text-slate-800 active:scale-95 transition-all duration-200 cursor-pointer"
+          >
+            <i class="pi pi-chevron-left text-xs" />
+            {{ labelVolver }}
+          </button>
+        </div>
+
+        <!-- Título principal -->
+        <div v-if="nota" class="flex flex-wrap items-center gap-3">
+          <span class="text-2xl md:text-3xl font-mono font-bold text-[#1e3a5f]">
+            {{ nota.numero_nota || '—' }}
+          </span>
+          <Tag
+            :value="labelEstado(nota.estado)"
+            :style="{
+              background: colorEstado(nota.estado),
+              color: 'white',
+              border: 'none',
+            }"
+            class="!text-sm"
           />
-          <template v-if="nota">
-            <span class="text-2xl md:text-3xl font-mono font-bold text-[#1e3a5f]">
-              {{ nota.numero_nota || '—' }}
-            </span>
-            <Tag
-              :value="labelEstado(nota.estado)"
-              :style="{
-                background: colorEstado(nota.estado),
-                color: ['ARCHIVADA', 'ANULADA'].includes(nota.estado) ? 'white' : 'white',
-                border: 'none',
-              }"
-              class="!text-sm"
-            />
-          </template>
         </div>
       </header>
 
@@ -925,62 +951,7 @@ watch(notaId, (nuevo) => {
 </template>
 
 <style scoped>
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: all 0.3s ease;
-}
-.slide-down-enter-from,
-.slide-down-leave-to {
-  opacity: 0;
-  transform: translateY(-1rem);
-}
-
 .nota-detalle {
   min-height: 100%;
-}
-
-.nota-detalle :deep(.p-card) {
-  background-color: white !important;
-  color: #1e293b !important;
-}
-
-.nota-detalle :deep(.p-card-title) {
-  color: #1e3a5f !important;
-  font-size: 1rem !important;
-  font-weight: 600 !important;
-}
-
-.nota-detalle :deep(.p-dialog) {
-  background-color: white !important;
-}
-
-.nota-detalle :deep(.p-dialog-header) {
-  background-color: white !important;
-  color: #1e3a5f !important;
-}
-
-.nota-detalle :deep(.p-dialog-content) {
-  background-color: white !important;
-}
-
-.nota-detalle :deep(.p-select),
-.nota-detalle :deep(.p-inputtext),
-.nota-detalle :deep(.p-textarea) {
-  background-color: white !important;
-  color: #1e293b !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-.nota-detalle :deep(.p-select-overlay) {
-  background-color: white !important;
-}
-
-.nota-detalle :deep(.p-select-option) {
-  color: #1e293b !important;
-  background-color: white !important;
-}
-
-.nota-detalle :deep(.p-select-option:hover) {
-  background-color: #f1f5f9 !important;
 }
 </style>

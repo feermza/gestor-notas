@@ -585,73 +585,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: all 0.3s ease;
-}
-.slide-down-enter-from,
-.slide-down-leave-to {
-  opacity: 0;
-  transform: translateY(-1rem);
-}
-
 .nueva-nota {
   min-height: 100%;
-}
-
-.nueva-nota :deep(.p-select),
-.nueva-nota :deep(.p-inputtext),
-.nueva-nota :deep(.p-textarea) {
-  background-color: white !important;
-  color: #1e293b !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-.nueva-nota :deep(.p-select-overlay),
-.nueva-nota :deep(.p-select-list) {
-  background-color: white !important;
-}
-
-.nueva-nota :deep(.p-select-option) {
-  color: #1e293b !important;
-  background-color: white !important;
-}
-
-.nueva-nota :deep(.p-select-option:hover) {
-  background-color: #f1f5f9 !important;
-}
-
-.nueva-nota :deep(.p-card) {
-  background-color: white !important;
-  color: #1e293b !important;
-}
-
-.nueva-nota :deep(.p-card-title) {
-  color: #1e3a5f !important;
-  font-size: 1rem !important;
-  font-weight: 600 !important;
-}
-
-/* Fix dropdowns PrimeVue - fondo oscuro */
-.nueva-nota :deep(.p-select-overlay),
-.nueva-nota :deep(.p-select-list),
-.nueva-nota :deep(.p-select-panel) {
-  background-color: white !important;
-  color: #1e293b !important;
-}
-.nueva-nota :deep(.p-select-option) {
-  color: #1e293b !important;
-  background-color: white !important;
-}
-.nueva-nota :deep(.p-select-option:hover),
-.nueva-nota :deep(.p-select-option.p-focus) {
-  background-color: #f1f5f9 !important;
-  color: #1e293b !important;
-}
-.nueva-nota :deep(.p-select-label) {
-  color: #1e293b !important;
-}
-.nueva-nota :deep(.p-placeholder) {
-  color: #94a3b8 !important;
 }
 </style>

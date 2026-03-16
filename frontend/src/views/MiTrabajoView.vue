@@ -214,7 +214,7 @@ onMounted(() => {
             <button
               type="button"
               class="text-sm text-[#1e3a5f] hover:underline font-medium"
-              @click="router.push('/notas/' + nota.id)"
+              @click="router.push(`/notas/${nota.id}?desde=mi-trabajo`)"
             >
               Ver detalle →
             </button>

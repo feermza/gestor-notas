@@ -331,7 +331,8 @@ onMounted(cargarDashboard)
                   <li
                     v-for="nota in ultimasIngresadas"
                     :key="nota.id"
-                    class="flex flex-wrap items-center gap-2 py-2 border-b border-gray-100 last:border-0"
+                    class="flex flex-wrap items-center gap-2 py-2 border-b border-gray-100 last:border-0 cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1"
+                    @click="router.push(`/notas/${nota.id}?desde=notas`)"
                   >
                     <span class="font-mono text-sm text-gray-700">{{ nota.numero_nota_interno || nota.numero_nota }}</span>
                     <span class="text-gray-800 flex-1 min-w-0" :title="nota.tema">{{ truncar(nota.tema, 40) }}</span>
@@ -456,7 +457,8 @@ onMounted(cargarDashboard)
                   <li
                     v-for="nota in pendientes"
                     :key="nota.id"
-                    class="flex flex-wrap items-center gap-2 py-2 border-b border-gray-100 last:border-0"
+                    class="flex flex-wrap items-center gap-2 py-2 border-b border-gray-100 last:border-0 cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1"
+                    @click="router.push(`/notas/${nota.id}?desde=mi-trabajo`)"
                   >
                     <span class="font-mono text-sm text-gray-700">{{ nota.numero_nota_interno || nota.numero_nota }}</span>
                     <span class="text-gray-800 flex-1 min-w-0" :title="nota.tema">{{ truncar(nota.tema, 40) }}</span>
@@ -514,7 +516,8 @@ onMounted(cargarDashboard)
                   <li
                     v-for="nota in ultimasIngresadas"
                     :key="nota.id"
-                    class="flex flex-wrap items-center gap-2 py-2 border-b border-gray-100 last:border-0"
+                    class="flex flex-wrap items-center gap-2 py-2 border-b border-gray-100 last:border-0 cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1"
+                    @click="router.push(`/notas/${nota.id}?desde=notas`)"
                   >
                     <span class="font-mono text-sm text-gray-700">{{ nota.numero_nota_interno || nota.numero_nota }}</span>
                     <span class="text-gray-800 flex-1 min-w-0" :title="nota.tema">{{ truncar(nota.tema, 40) }}</span>

@@ -122,20 +122,23 @@ async function cargarNotas() {
 // Aplicar query params a los filtros (para navegación programática)
 function aplicarQueryParams() {
   const q = route.query
-  // Resetear siempre primero
-  filtroEstado.value = ''
+  // Resetear siempre primero (null para que el Dropdown muestre placeholder cuando no hay valor)
+  filtroEstado.value = null
+  filtroPrioridad.value = null
   soloAtrasadas.value = false
   sinAsignar.value = false
   textoBusqueda.value = ''
-  // Luego activar los que correspondan
+  // Luego activar los que correspondan (value = string igual a option-value, ej. 'EN_PROCESO')
   if (q.estado) filtroEstado.value = q.estado
+  if (q.prioridad) filtroPrioridad.value = q.prioridad
   if (q.atrasadas === 'true') soloAtrasadas.value = true
   if (q.sin_asignar === 'true') sinAsignar.value = true
   if (q.search) textoBusqueda.value = q.search
 }
 
 function irADetalle(id) {
-  router.push(`/notas/${id}`)
+  const desde = sinAsignar.value ? 'sin-asignar' : 'notas'
+  router.push(`/notas/${id}?desde=${desde}`)
 }
 
 function irANueva() {
@@ -161,10 +164,13 @@ onMounted(() => {
   cargarNotas()
 })
 
-// Si cambian los query params (ej. navegación desde dashboard), reaplicar filtros
+// Si cambian los query params (ej. navegación desde dashboard), reaplicar filtros y actualizar tabla
 watch(
   () => route.query,
-  () => aplicarQueryParams(),
+  () => {
+    aplicarQueryParams()
+    cargarNotas()
+  },
   { deep: true },
 )
 </script>
@@ -364,73 +370,5 @@ watch(
 <style scoped>
 .notas-view {
   min-height: 100%;
-}
-
-.notas-view :deep(.p-button-label) {
-  color: white !important;
-}
-
-.notas-view :deep(.p-datatable) {
-  background-color: white !important;
-}
-.notas-view :deep(.p-datatable-table) {
-  background-color: white !important;
-}
-.notas-view :deep(.p-datatable-thead > tr > th) {
-  background-color: #f8fafc !important;
-  color: #1e293b !important;
-  border-bottom: 2px solid #e2e8f0 !important;
-}
-.notas-view :deep(.p-datatable-tbody > tr) {
-  background-color: white !important;
-  color: #1e293b !important;
-}
-.notas-view :deep(.p-datatable-tbody > tr:hover) {
-  background-color: #f1f5f9 !important;
-}
-.notas-view :deep(.p-datatable-tbody > tr.fila-atrasada) {
-  background-color: #fff5f5 !important;
-}
-.notas-view :deep(.p-paginator) {
-  background-color: white !important;
-  color: #1e293b !important;
-  border-top: 1px solid #e2e8f0 !important;
-}
-.notas-view :deep(.p-select),
-.notas-view :deep(.p-select-overlay) {
-  background-color: white !important;
-  color: #1e293b !important;
-  border: 1px solid #e2e8f0 !important;
-}
-.notas-view :deep(.p-select-option) {
-  color: #1e293b !important;
-}
-.notas-view :deep(.p-select-option:hover) {
-  background-color: #f1f5f9 !important;
-}
-
-@keyframes pulso {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.6;
-  }
-}
-.tag-urgente {
-  animation: pulso 1.5s ease-in-out infinite;
-}
-
-.notas-view :deep(.p-datatable .p-datatable-tbody > tr > td) {
-  word-break: break-word;
-}
-
-/* Fix dropdown Estado y Prioridad */
-.notas-view :deep(.p-select-label) {
-  color: #1e293b !important;
-}
-.notas-view :deep(.p-placeholder) {
-  color: #94a3b8 !important;
 }
 </style>

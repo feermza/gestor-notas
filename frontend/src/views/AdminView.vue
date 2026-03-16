@@ -327,23 +327,4 @@ onMounted(() => {
 .admin-view {
   min-height: 100%;
 }
-
-.admin-view :deep(.p-datatable) {
-  background-color: white !important;
-}
-.admin-view :deep(.p-datatable-table) {
-  background-color: white !important;
-}
-.admin-view :deep(.p-datatable-thead > tr > th) {
-  background-color: #f8fafc !important;
-  color: #1e293b !important;
-  border-bottom: 2px solid #e2e8f0 !important;
-}
-.admin-view :deep(.p-datatable-tbody > tr) {
-  background-color: white !important;
-  color: #1e293b !important;
-}
-.admin-view :deep(.p-datatable-tbody > tr:hover) {
-  background-color: #f1f5f9 !important;
-}
 </style>
