@@ -1,24 +1,24 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
 import { get } from '@/api/cliente'
+import BtnDetalle from '@/components/BtnDetalle.vue'
 import {
+  COLORES_ESTADO,
+  COLORES_PRIORIDAD,
+  LABELS_ESTADO,
   truncar,
-  formatoFecha,
-  colorEstado,
-  labelEstado,
-  colorPrioridad,
-  labelPrioridad,
+  haceCuanto,
   esAtrasada,
 } from '@/utils/notas'
-
-const router = useRouter()
 
 const cargando = ref(true)
 const error = ref(null)
 const notas = ref([])
 
 const textoBusqueda = ref('')
+const hoverId = ref(null)
+const paginaActual = ref(1)
+const porPagina = ref(10)
 
 const pendientesFiltrados = computed(() => {
   let lista = notas.value
@@ -33,7 +33,24 @@ const pendientesFiltrados = computed(() => {
   return lista
 })
 
+const notasPaginadas = computed(() => {
+  const inicio = (paginaActual.value - 1) * porPagina.value
+  return pendientesFiltrados.value.slice(inicio, inicio + porPagina.value)
+})
+
+const totalPaginas = computed(() =>
+  Math.max(1, Math.ceil(pendientesFiltrados.value.length / porPagina.value)),
+)
+
 const totalPendientes = computed(() => pendientesFiltrados.value.length)
+
+watch(textoBusqueda, () => {
+  paginaActual.value = 1
+})
+
+watch(totalPaginas, (tp) => {
+  if (paginaActual.value > tp) paginaActual.value = tp
+})
 
 async function cargarPendientes() {
   cargando.value = true
@@ -46,15 +63,6 @@ async function cargarPendientes() {
   } finally {
     cargando.value = false
   }
-}
-
-function irADetalle(id) {
-  router.push(`/notas/${id}`)
-}
-
-function claseFila(nota) {
-  const atrasada = nota.atrasada ?? esAtrasada(nota)
-  return atrasada ? 'fila-atrasada' : ''
 }
 
 onMounted(cargarPendientes)
@@ -93,115 +101,118 @@ onMounted(cargarPendientes)
         <ProgressBar mode="indeterminate" style="height: 4px" />
       </div>
 
-      <div v-if="!cargando" class="card rounded-xl overflow-hidden shadow-md">
-        <DataTable
-          :value="pendientesFiltrados"
-          :row-class="claseFila"
-          paginator
-          :rows="10"
-          :rows-per-page-options="[10, 25, 50]"
-          data-key="id"
-          striped-rows
-          responsive-layout="stack"
-          breakpoint="960px"
-          class="p-datatable-sm"
-          current-page-report-template="Mostrando {first} a {last} de {totalRecords} pendientes"
-        >
-          <Column field="numero_nota" header="Número" sortable>
-            <template #body="{ data }">
+      <div
+        v-if="!cargando"
+        class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100"
+      >
+        <template v-if="pendientesFiltrados.length === 0">
+          <div class="py-12 text-center text-gray-500">
+            <i class="pi pi-inbox text-4xl mb-3 block opacity-60" />
+            <p class="text-base font-medium">No tenés notas pendientes. ¡Todo al día!</p>
+          </div>
+        </template>
+        <template v-else>
+          <div class="notas-header">
+            <span>Número</span>
+            <span>Tema</span>
+            <span>Tarea</span>
+            <span>Estado</span>
+            <span>Prioridad</span>
+            <span>Ingreso</span>
+            <span></span>
+          </div>
+          <ul class="divide-y divide-gray-100">
+            <li
+              v-for="nota in notasPaginadas"
+              :key="nota.id"
+              class="fila-nota"
+              :class="{
+                'fila-nota--atrasada': nota.atrasada ?? esAtrasada(nota),
+              }"
+              @mouseenter="hoverId = nota.id"
+              @mouseleave="hoverId = null"
+              :style="{
+                display: 'grid',
+                gridTemplateColumns: '130px 1fr 120px 110px 90px 90px 110px',
+                alignItems: 'center',
+                gap: '12px',
+                borderLeftColor:
+                  hoverId === nota.id ? COLORES_ESTADO[nota.estado] : 'transparent',
+              }"
+            >
+              <span class="font-mono text-sm font-bold text-[#1e3a5f] min-w-0">
+                {{ nota.numero_nota || nota.numero_nota_interno || '—' }}
+              </span>
+              <span v-tooltip.top="nota.tema || '—'" class="text-sm text-gray-800 truncate min-w-0">
+                {{ truncar(nota.tema, 48) || '—' }}
+              </span>
+              <span
+                v-tooltip.top="nota.tarea_asignada || '—'"
+                class="text-xs text-gray-600 truncate min-w-0"
+              >
+                {{ truncar(nota.tarea_asignada, 28) || '—' }}
+              </span>
+              <span
+                class="px-2 py-0.5 rounded-full text-xs text-white font-medium text-center min-w-0 justify-self-center"
+                :style="{ backgroundColor: COLORES_ESTADO[nota.estado] }"
+              >
+                {{ LABELS_ESTADO[nota.estado] }}
+              </span>
+              <span
+                class="px-2 py-0.5 rounded-full text-xs font-medium text-center min-w-0 justify-self-center"
+                :class="{
+                  'text-white': !['NORMAL', 'MEDIA'].includes(nota.prioridad),
+                  'text-slate-800': ['NORMAL', 'MEDIA'].includes(nota.prioridad),
+                  'tag-urgente': nota.prioridad === 'URGENTE',
+                }"
+                :style="{ backgroundColor: COLORES_PRIORIDAD[nota.prioridad] || '#64748b' }"
+              >
+                {{ nota.prioridad }}
+              </span>
+              <span class="text-xs text-gray-600 text-right min-w-0">
+                {{ haceCuanto(nota.fecha_ingreso) }}
+              </span>
+              <span class="justify-self-end min-w-0">
+                <BtnDetalle :nota-id="nota.id" desde="pendientes" />
+              </span>
+            </li>
+          </ul>
+          <div class="pie-paginacion flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-white">
+            <span class="text-xs text-gray-600"> {{ pendientesFiltrados.length }} pendientes </span>
+            <div class="flex items-center gap-2">
               <button
                 type="button"
-                class="font-mono text-sm text-[#1e3a5f] hover:underline cursor-pointer bg-transparent border-none p-0"
-                @click="irADetalle(data.id)"
+                @click="paginaActual--"
+                :disabled="paginaActual === 1"
+                class="px-2 py-1 rounded text-sm text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
-                {{ data.numero_nota || '—' }}
+                ‹
               </button>
-            </template>
-          </Column>
-
-          <Column field="tema" header="Tema">
-            <template #body="{ data }">
-              <span v-tooltip.top="data.tema || '—'" class="block truncate max-w-[200px]">
-                {{ truncar(data.tema, 50) || '—' }}
+              <span class="text-xs text-gray-500">
+                {{ paginaActual }} / {{ totalPaginas }}
               </span>
-            </template>
-          </Column>
-
-          <Column field="tarea_asignada" header="Tarea asignada">
-            <template #body="{ data }">
-              <span v-tooltip.top="data.tarea_asignada || '—'" class="block truncate max-w-[240px]">
-                {{ truncar(data.tarea_asignada, 50) || '—' }}
-              </span>
-            </template>
-          </Column>
-
-          <Column field="estado" header="Estado">
-            <template #body="{ data }">
-              <Tag
-                :value="labelEstado(data.estado)"
-                :style="{
-                  background: colorEstado(data.estado),
-                  color: 'white',
-                  border: 'none',
-                }"
-                class="!text-xs"
-              />
-            </template>
-          </Column>
-
-          <Column field="prioridad" header="Prioridad">
-            <template #body="{ data }">
-              <Tag
-                :value="labelPrioridad(data.prioridad)"
-                :class="{ 'tag-urgente': data.prioridad === 'URGENTE' }"
-                :style="{
-                  background: colorPrioridad(data.prioridad),
-                  color: ['BAJA', 'NORMAL', 'MEDIA'].includes(data.prioridad) ? '#1e293b' : 'white',
-                  border: 'none',
-                }"
-                class="!text-xs"
-              />
-            </template>
-          </Column>
-
-          <Column field="fecha_ingreso" header="Fecha ingreso">
-            <template #body="{ data }">
-              {{ formatoFecha(data.fecha_ingreso) }}
-            </template>
-          </Column>
-
-          <Column header="Acciones" class="acciones-col">
-            <template #body="{ data }">
-              <Button
-                icon="pi pi-eye"
-                text
-                rounded
-                severity="secondary"
-                size="small"
-                v-tooltip.top="'Ver detalle'"
-                @click="irADetalle(data.id)"
-              />
-            </template>
-          </Column>
-
-          <template #empty>
-            <div class="py-12 text-center text-gray-500">
-              <i class="pi pi-inbox-in text-4xl mb-3 block opacity-60" />
-              <p class="text-base font-medium">No tenés notas pendientes. ¡Todo al día!</p>
+              <button
+                type="button"
+                @click="paginaActual++"
+                :disabled="paginaActual === totalPaginas"
+                class="px-2 py-1 rounded text-sm text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                ›
+              </button>
             </div>
-          </template>
-        </DataTable>
+          </div>
+        </template>
+      </div>
 
-        <div class="p-3 border-t border-gray-100 flex justify-end">
-          <button
-            type="button"
-            @click="cargarPendientes"
-            class="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-[#1e3a5f] bg-white hover:bg-[#eef2f7] transition-colors text-sm font-medium shadow-sm"
-          >
-            <i class="pi pi-refresh" />
-            Recargar
-          </button>
-        </div>
+      <div v-if="!cargando" class="mt-3 flex justify-end">
+        <button
+          type="button"
+          @click="cargarPendientes"
+          class="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-[#1e3a5f] bg-white transition-colors text-sm font-medium shadow-sm hover:bg-[#475569] hover:text-white hover:border-[#475569]"
+        >
+          <i class="pi pi-refresh" />
+          Recargar
+        </button>
       </div>
     </div>
   </div>
@@ -210,5 +221,40 @@ onMounted(cargarPendientes)
 <style scoped>
 .pendientes-view {
   min-height: 100%;
+}
+
+.notas-header {
+  display: grid;
+  grid-template-columns: 130px 1fr 120px 110px 90px 90px 110px;
+  align-items: center;
+  padding: 10px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  gap: 12px;
+}
+
+.fila-nota {
+  padding: 10px 16px;
+  background: white;
+  border-left: 3px solid transparent;
+  transition: all 0.15s;
+  cursor: default;
+}
+
+.fila-nota:hover {
+  background: #d2d7e4;
+}
+
+.fila-nota--atrasada {
+  background: #fff5f5;
+}
+
+.fila-nota--atrasada:hover {
+  background: #d2d7e4;
 }
 </style>

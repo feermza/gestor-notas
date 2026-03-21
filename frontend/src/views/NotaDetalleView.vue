@@ -1,8 +1,9 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { get, post, postFormData } from '@/api/cliente'
 import { useAuthStore } from '@/stores/auth'
+import BtnVolver from '@/components/BtnVolver.vue'
 import {
   formatoFecha,
   formatoFechaHora,
@@ -13,7 +14,6 @@ import {
 } from '@/utils/notas'
 
 const route = useRoute()
-const router = useRouter()
 
 // Toasts personalizados (mejor contraste)
 const mensajeExito = ref('')
@@ -70,7 +70,7 @@ const usuariosParaAsignar = computed(() =>
 
 const notaId = computed(() => route.params.id)
 
-// Origen de navegación para el botón "Volver" (?desde= mi-trabajo | notas | sin-asignar)
+// Origen de navegación para el botón "Volver" (?desde=mis-notas | notas | sin-asignar | inicio | pendientes)
 const origenNavegacion = ref('notas')
 
 // Sector de origen (la API puede devolver id; resolvemos con lista de sectores)
@@ -215,20 +215,20 @@ async function subirAdjunto(event) {
   }
 }
 
-function volver() {
-  if (origenNavegacion.value === 'mi-trabajo') {
-    router.push('/mi-trabajo')
-  } else if (origenNavegacion.value === 'sin-asignar') {
-    router.push('/notas?estado=INGRESADA')
-  } else {
-    router.push('/notas')
-  }
-}
+const destinoVolver = computed(() => {
+  if (origenNavegacion.value === 'mis-notas') return '/mis-notas'
+  if (origenNavegacion.value === 'sin-asignar') return '/notas?estado=INGRESADA'
+  if (origenNavegacion.value === 'inicio') return '/'
+  if (origenNavegacion.value === 'pendientes') return '/notas/pendientes'
+  return '/notas'
+})
 
 const labelVolver = computed(() => {
-  if (origenNavegacion.value === 'mi-trabajo') return 'Mi Trabajo'
-  if (origenNavegacion.value === 'sin-asignar') return '← Volver a Sin Asignar'
-  return '← Volver a Notas'
+  if (origenNavegacion.value === 'mis-notas') return 'Asignadas'
+  if (origenNavegacion.value === 'sin-asignar') return 'Sin Asignar'
+  if (origenNavegacion.value === 'inicio') return 'Inicio'
+  if (origenNavegacion.value === 'pendientes') return 'Pendientes'
+  return 'General'
 })
 
 // Cambio de estado
@@ -393,13 +393,7 @@ watch(
       <header class="mb-6">
         <!-- Back navigation -->
         <div class="mb-3">
-          <button
-            @click="volver"
-            class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-slate-600 bg-slate-100 border border-slate-200 hover:bg-slate-200 hover:text-slate-800 active:scale-95 transition-all duration-200 cursor-pointer"
-          >
-            <i class="pi pi-chevron-left text-xs" />
-            {{ labelVolver }}
-          </button>
+          <BtnVolver :label="labelVolver" :destino="destinoVolver" />
         </div>
 
         <!-- Título principal -->
@@ -461,11 +455,11 @@ watch(
                   <p class="text-gray-800">{{ labelCanal(nota.canal_ingreso) }}</p>
                 </div>
                 <div v-if="nota.email_respuesta">
-                  <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">
+                  <p class="text-xs text-gray-600 uppercase tracking-wide mb-1">
                     Email de respuesta
                   </p>
                   <p class="text-sm text-gray-800 flex items-center gap-1">
-                    <i class="pi pi-envelope text-xs text-gray-400" />
+                    <i class="pi pi-envelope text-xs text-gray-600" />
                     {{ nota.email_respuesta }}
                   </p>
                 </div>

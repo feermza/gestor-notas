@@ -30,7 +30,7 @@ export const LABELS_ESTADO = {
 
 // Colores y etiquetas para prioridad (BAJA, NORMAL/MEDIA, ALTA, URGENTE)
 export const COLORES_PRIORIDAD = {
-  BAJA: '#cbd5e1',
+  BAJA: '#64748b',
   NORMAL: '#0ea5e9',
   MEDIA: '#0ea5e9', // API devuelve MEDIA, mismo color que NORMAL
   ALTA: '#f97316',

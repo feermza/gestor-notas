@@ -1,14 +1,13 @@
 <script setup>
 /**
  * MainLayout — Menú lateral por rol.
- * SUPERVISOR/ADMINISTRADOR: Inicio, Notas, Sin asignar (si hay), Administración (solo ADMIN)
- * OPERADOR: Inicio, Mi Trabajo, Notas
+ * SUPERVISOR/ADMINISTRADOR: Inicio, General, Sin asignar, Administración (solo ADMIN)
+ * OPERADOR: Inicio, Asignadas, General
  * CONSULTOR: Inicio, Notas
  */
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { get } from '@/api/cliente'
 import { COLORES_ESTADO, LABELS_ESTADO } from '@/utils/notas'
 
 const router = useRouter()
@@ -16,6 +15,16 @@ const route = useRoute()
 const auth = useAuthStore()
 
 const sidebarVisible = ref(false)
+const sidebarColapsado = ref(localStorage.getItem('sidebar-collapsed') === 'true')
+
+function toggleSidebar() {
+  if (window.innerWidth < 1024) {
+    sidebarVisible.value = !sidebarVisible.value
+    return
+  }
+  sidebarColapsado.value = !sidebarColapsado.value
+  localStorage.setItem('sidebar-collapsed', String(sidebarColapsado.value))
+}
 
 // Búsqueda global en navbar (solo visible si el usuario está autenticado)
 const busquedaExpandida = ref(false)
@@ -76,20 +85,6 @@ watch(busquedaExpandida, (val) => {
   if (val) nextTick(() => inputBusqueda.value?.focus())
 })
 
-// Solo para SUPERVISOR/ADMIN: si hay notas INGRESADA sin responsable, mostrar "Sin asignar"
-const hayNotasSinAsignar = ref(false)
-
-async function cargarNotasSinAsignar() {
-  if (!auth.usuario || !['SUPERVISOR', 'ADMINISTRADOR'].includes(auth.usuario.rol)) return
-  try {
-    const res = await get('/api/notas/?estado=INGRESADA')
-    const lista = Array.isArray(res) ? res : res?.results || []
-    hayNotasSinAsignar.value = lista.some((n) => !n.responsable || !n.responsable.id)
-  } catch {
-    hayNotasSinAsignar.value = false
-  }
-}
-
 const menuItems = computed(() => {
   const rol = auth.usuario?.rol
   const items = []
@@ -99,13 +94,12 @@ const menuItems = computed(() => {
 
   // SUPERVISOR / ADMINISTRADOR
   if (rol === 'SUPERVISOR' || rol === 'ADMINISTRADOR') {
-    items.push({ label: 'Notas', icon: 'pi pi-list', to: '/notas' })
-    // Sin asignar: visible solo si hay notas sin asignar
-    if (hayNotasSinAsignar.value) {
-      items.push({ label: 'Sin asignar', icon: 'pi pi-inbox', to: '/notas?estado=INGRESADA' })
-    }
+    items.push({ type: 'section', label: 'NOTAS' })
+    items.push({ label: 'General', icon: 'pi pi-list', to: '/notas' })
+    items.push({ label: 'Sin Asignar', icon: 'pi pi-inbox', to: '/notas?estado=INGRESADA' })
     // Usuarios y Administración: solo ADMINISTRADOR
     if (rol === 'ADMINISTRADOR') {
+      items.push({ type: 'section', label: 'SISTEMA' })
       items.push({ label: 'Usuarios', icon: 'pi pi-users', to: '/usuarios' })
       items.push({ label: 'Sectores', icon: 'pi pi-building', to: '/sectores' })
       items.push({ label: 'Administración', icon: 'pi pi-cog', to: '/admin' })
@@ -115,13 +109,15 @@ const menuItems = computed(() => {
 
   // OPERADOR
   if (rol === 'OPERADOR') {
-    items.push({ label: 'Mi Trabajo', icon: 'pi pi-briefcase', to: '/mi-trabajo' })
-    items.push({ label: 'Notas', icon: 'pi pi-list', to: '/notas' })
+    items.push({ type: 'section', label: 'NOTAS' })
+    items.push({ label: 'Asignadas', icon: 'pi pi-briefcase', to: '/mis-notas' })
+    items.push({ label: 'General', icon: 'pi pi-list', to: '/notas' })
     return items
   }
 
   // CONSULTOR (y cualquier otro rol por defecto)
-  items.push({ label: 'Notas', icon: 'pi pi-list', to: '/notas' })
+  items.push({ type: 'section', label: 'NOTAS' })
+  items.push({ label: 'General', icon: 'pi pi-list', to: '/notas' })
   return items
 })
 
@@ -139,7 +135,6 @@ async function cerrarSesion() {
 }
 
 onMounted(() => {
-  cargarNotasSinAsignar()
   // Cerrar y colapsar búsqueda al hacer click fuera
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.busqueda-global')) {
@@ -161,9 +156,9 @@ onMounted(() => {
           icon="pi pi-bars"
           text
           rounded
-          class="text-white lg:hidden"
+          class="text-white"
           aria-label="Abrir menú"
-          @click="sidebarVisible = !sidebarVisible"
+          @click="toggleSidebar"
         />
         <span class="font-semibold text-lg">Gestor de Notas - RRHH</span>
       </div>
@@ -217,7 +212,7 @@ onMounted(() => {
           <div
             v-for="nota in resultados"
             :key="nota.id"
-            class="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0"
+            class="flex items-center justify-between px-4 py-3 hover:bg-[#d2d7e4] cursor-pointer border-b border-gray-100 last:border-0 transition-colors"
             @click="irANota(nota.id)"
           >
             <div>
@@ -288,43 +283,59 @@ onMounted(() => {
           <span class="font-semibold text-gray-800">Menú</span>
         </template>
         <nav class="flex flex-col gap-1 py-2">
-          <router-link
-            v-for="item in menuItems"
-            :key="item.to"
-            :to="item.to"
-            class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100"
-            :class="esActivo(item) ? 'bg-primario/10 font-medium' : ''"
-            style="--color-primario: var(--color-primario)"
-            @click="sidebarVisible = false"
-          >
-            <i :class="['pi', item.icon]"></i>
-            <span>{{ item.label }}</span>
-          </router-link>
+          <template v-for="item in menuItems" :key="item.to || `section-${item.label}`">
+            <p
+              v-if="item.type === 'section'"
+              class="px-3 pt-4 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider"
+            >
+              {{ item.label }}
+            </p>
+            <router-link
+              v-else
+              :to="item.to"
+              class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100"
+              :class="esActivo(item) ? 'bg-primario/10 font-medium' : ''"
+              style="--color-primario: var(--color-primario)"
+              @click="sidebarVisible = false"
+            >
+              <i :class="item.icon"></i>
+              <span>{{ item.label }}</span>
+            </router-link>
+          </template>
         </nav>
       </Sidebar>
 
       <!-- Sidebar desktop (persistente) -->
       <aside
-        class="hidden lg:flex lg:flex-col w-64 border-r border-gray-200 bg-white flex-shrink-0"
+        class="hidden lg:flex lg:flex-col border-r border-gray-200 bg-white flex-shrink-0 transition-all duration-200"
+        :style="{ width: sidebarColapsado ? '64px' : '250px' }"
       >
-        <div class="p-4 border-b border-gray-100">
-          <span class="font-semibold text-gray-800">Menú</span>
+        <div class="p-4 border-b border-gray-100 flex items-center justify-center">
+          <span v-show="!sidebarColapsado" class="font-semibold text-gray-800">Menú</span>
         </div>
         <nav class="flex flex-col gap-1 p-2">
-          <router-link
-            v-for="item in menuItems"
-            :key="item.to"
-            :to="item.to"
-            class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors"
-            :class="
-              esActivo(item)
-                ? 'bg-gray-100 font-medium text-primario'
-                : 'text-gray-700 hover:bg-gray-50'
-            "
-          >
-            <i :class="['pi', item.icon]"></i>
-            <span>{{ item.label }}</span>
-          </router-link>
+          <template v-for="item in menuItems" :key="item.to || `section-desktop-${item.label}`">
+            <p
+              v-if="item.type === 'section'"
+              v-show="!sidebarColapsado"
+              class="px-3 pt-4 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider"
+            >
+              {{ item.label }}
+            </p>
+            <router-link
+              v-else
+              :to="item.to"
+              v-tooltip.right="sidebarColapsado ? item.label : null"
+              class="flex items-center gap-3 py-2 rounded-lg transition-colors"
+              :class="[
+                sidebarColapsado ? 'justify-center px-0' : 'justify-start px-3',
+                esActivo(item) ? 'bg-gray-100 font-medium text-primario' : 'text-gray-700 hover:bg-gray-50',
+              ]"
+            >
+              <i :class="item.icon"></i>
+              <span v-show="!sidebarColapsado">{{ item.label }}</span>
+            </router-link>
+          </template>
         </nav>
       </aside>
 

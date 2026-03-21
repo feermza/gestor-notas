@@ -33,11 +33,11 @@ const router = createRouter({
           name: 'dashboard',
           component: DashboardView,
         },
-        // Mi Trabajo (OPERADOR)
+        // Mis Notas (OPERADOR)
         {
-          path: 'mi-trabajo',
-          name: 'mi-trabajo',
-          component: () => import('@/views/MiTrabajoView.vue'),
+          path: 'mis-notas',
+          name: 'mis-notas',
+          component: () => import('@/views/NotasAsignadasView.vue'),
           meta: { requiresAuth: true },
         },
         // Listado de notas

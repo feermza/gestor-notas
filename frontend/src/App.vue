@@ -23,9 +23,11 @@
 .p-datatable-tbody > tr {
   background-color: white !important;
   color: #1e293b !important;
+  border-left: 3px solid transparent !important;
+  transition: all 0.15s !important;
 }
 .p-datatable-tbody > tr:hover {
-  background-color: #f1f5f9 !important;
+  background-color: #d2d7e4 !important;
 }
 .p-datatable-tbody > tr.fila-atrasada {
   background-color: #fff5f5 !important;
@@ -164,8 +166,13 @@ textarea::placeholder {
 
 /* Tag prioridad URGENTE: animación de pulso */
 @keyframes pulso {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 .tag-urgente {
   animation: pulso 1.5s ease-in-out infinite;

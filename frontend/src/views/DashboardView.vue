@@ -8,23 +8,15 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { get } from '@/api/cliente'
 import { useAuthStore } from '@/stores/auth'
-import {
-  truncar,
-  formatoFecha,
-  haceCuanto,
-  colorEstado,
-  labelEstado,
-  esDelMesActual,
-} from '@/utils/notas'
+import TablaNotasSimple from '@/components/TablaNotasSimple.vue'
+import { esDelMesActual } from '@/utils/notas'
 
 const router = useRouter()
 const auth = useAuthStore()
 
 // Rol del usuario actual
 const rol = computed(() => auth.usuario?.rol ?? null)
-const esSupervisorOAdmin = computed(() =>
-  ['SUPERVISOR', 'ADMINISTRADOR'].includes(rol.value),
-)
+const esSupervisorOAdmin = computed(() => ['SUPERVISOR', 'ADMINISTRADOR'].includes(rol.value))
 const esOperador = computed(() => rol.value === 'OPERADOR')
 
 // Estado del dashboard
@@ -51,8 +43,18 @@ const fechaActual = computed(() => {
   const ahora = new Date()
   const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
   const meses = [
-    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+    'enero',
+    'febrero',
+    'marzo',
+    'abril',
+    'mayo',
+    'junio',
+    'julio',
+    'agosto',
+    'septiembre',
+    'octubre',
+    'noviembre',
+    'diciembre',
   ]
   return `${dias[ahora.getDay()]}, ${ahora.getDate()} de ${meses[ahora.getMonth()]} de ${ahora.getFullYear()}`
 })
@@ -138,10 +140,6 @@ async function cargarDashboard() {
   }
 }
 
-function irA(ruta) {
-  router.push(ruta)
-}
-
 // Tarjeta reutilizable con estilos
 const TARJETA_COLORES = {
   INGRESADAS: '#475569',
@@ -204,7 +202,9 @@ onMounted(cargarDashboard)
                   <div class="flex items-center gap-3">
                     <i class="pi pi-inbox text-2xl" style="color: #475569" />
                     <div>
-                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Ingresadas</p>
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Ingresadas
+                      </p>
                       <p class="text-2xl font-bold text-gray-900">{{ ingresadas }}</p>
                     </div>
                   </div>
@@ -222,7 +222,9 @@ onMounted(cargarDashboard)
                   <div class="flex items-center gap-3">
                     <i class="pi pi-spinner pi-spin text-2xl" style="color: #1d4ed8" />
                     <div>
-                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">En proceso</p>
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        En proceso
+                      </p>
                       <p class="text-2xl font-bold text-gray-900">{{ enProceso }}</p>
                     </div>
                   </div>
@@ -240,8 +242,13 @@ onMounted(cargarDashboard)
                   <div class="flex items-center gap-3">
                     <i class="pi pi-user-minus text-2xl" style="color: #e11d48" />
                     <div>
-                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Sin asignar</p>
-                      <p class="text-2xl font-bold" :class="sinAsignar > 0 ? 'text-[#e11d48]' : 'text-gray-900'">
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Sin asignar
+                      </p>
+                      <p
+                        class="text-2xl font-bold"
+                        :class="sinAsignar > 0 ? 'text-[#e11d48]' : 'text-gray-900'"
+                      >
                         {{ sinAsignar }}
                       </p>
                     </div>
@@ -260,8 +267,13 @@ onMounted(cargarDashboard)
                   <div class="flex items-center gap-3">
                     <i class="pi pi-exclamation-triangle text-2xl" style="color: #e11d48" />
                     <div>
-                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Atrasadas</p>
-                      <p class="text-2xl font-bold" :class="atrasadas > 0 ? 'text-[#e11d48]' : 'text-gray-900'">
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Atrasadas
+                      </p>
+                      <p
+                        class="text-2xl font-bold"
+                        :class="atrasadas > 0 ? 'text-[#e11d48]' : 'text-gray-900'"
+                      >
                         {{ atrasadas }}
                       </p>
                     </div>
@@ -280,7 +292,9 @@ onMounted(cargarDashboard)
                   <div class="flex items-center gap-3">
                     <i class="pi pi-clock text-2xl" style="color: #d97706" />
                     <div>
-                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">En espera</p>
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        En espera
+                      </p>
                       <p class="text-2xl font-bold text-gray-900">{{ enEspera }}</p>
                     </div>
                   </div>
@@ -298,7 +312,9 @@ onMounted(cargarDashboard)
                   <div class="flex items-center gap-3">
                     <i class="pi pi-check-circle text-2xl" style="color: #059669" />
                     <div>
-                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Resueltas este mes</p>
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Resueltas este mes
+                      </p>
                       <p class="text-2xl font-bold text-gray-900">{{ resueltasEsteMes }}</p>
                     </div>
                   </div>
@@ -327,32 +343,12 @@ onMounted(cargarDashboard)
                 </div>
               </template>
               <template v-else>
-                <ul class="space-y-3">
-                  <li
-                    v-for="nota in ultimasIngresadas"
-                    :key="nota.id"
-                    class="flex flex-wrap items-center gap-2 py-2 border-b border-gray-100 last:border-0 cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1"
-                    @click="router.push(`/notas/${nota.id}?desde=notas`)"
-                  >
-                    <span class="font-mono text-sm text-gray-700">{{ nota.numero_nota_interno || nota.numero_nota }}</span>
-                    <span class="text-gray-800 flex-1 min-w-0" :title="nota.tema">{{ truncar(nota.tema, 40) }}</span>
-                    <Tag
-                      :value="labelEstado(nota.estado)"
-                      :style="{ background: colorEstado(nota.estado), color: 'white', border: 'none' }"
-                      class="!text-xs"
-                    />
-                    <span class="text-sm text-gray-500">{{ haceCuanto(nota.fecha_ingreso) }}</span>
-                  </li>
-                </ul>
-                <div class="mt-4 pt-3 border-t border-gray-100">
-                  <Button
-                    label="Ver todas"
-                    link
-                    size="small"
-                    class="p-0 text-[#1e3a5f] font-medium"
-                    @click="irA('/notas')"
-                  />
-                </div>
+                <TablaNotasSimple
+                  :notas="ultimasIngresadas"
+                  :cargando="cargando"
+                  desde="inicio"
+                  :clickeable="true"
+                />
               </template>
             </template>
           </Card>
@@ -381,14 +377,16 @@ onMounted(cargarDashboard)
             <div
               class="rounded-lg shadow-sm overflow-hidden border-l-4 hover:shadow-md transition-shadow cursor-pointer"
               style="border-left-color: #6366f1"
-              @click="router.push('/mi-trabajo?estado=ASIGNADA')"
+              @click="router.push('/mis-notas?estado=ASIGNADA')"
             >
               <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
                 <template #content>
                   <div class="flex items-center gap-3">
                     <i class="pi pi-inbox text-2xl" style="color: #6366f1" />
                     <div>
-                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Mis asignadas</p>
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Mis asignadas
+                      </p>
                       <p class="text-2xl font-bold text-gray-900">{{ misAsignadas }}</p>
                     </div>
                   </div>
@@ -399,14 +397,16 @@ onMounted(cargarDashboard)
             <div
               class="rounded-lg shadow-sm overflow-hidden border-l-4 hover:shadow-md transition-shadow cursor-pointer"
               style="border-left-color: #1d4ed8"
-              @click="router.push('/mi-trabajo?estado=EN_PROCESO')"
+              @click="router.push('/mis-notas?estado=EN_PROCESO')"
             >
               <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
                 <template #content>
                   <div class="flex items-center gap-3">
                     <i class="pi pi-spinner pi-spin text-2xl" style="color: #1d4ed8" />
                     <div>
-                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Mis en proceso</p>
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Mis en proceso
+                      </p>
                       <p class="text-2xl font-bold text-gray-900">{{ misEnProceso }}</p>
                     </div>
                   </div>
@@ -417,14 +417,16 @@ onMounted(cargarDashboard)
             <div
               class="rounded-lg shadow-sm overflow-hidden border-l-4 hover:shadow-md transition-shadow cursor-pointer"
               style="border-left-color: #d97706"
-              @click="router.push('/mi-trabajo?estado=EN_ESPERA')"
+              @click="router.push('/mis-notas?estado=EN_ESPERA')"
             >
               <Card class="!shadow-none !border-0 !rounded-none" style="background-color: white">
                 <template #content>
                   <div class="flex items-center gap-3">
                     <i class="pi pi-clock text-2xl" style="color: #d97706" />
                     <div>
-                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Mis en espera</p>
+                      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Mis en espera
+                      </p>
                       <p class="text-2xl font-bold text-gray-900">{{ misEnEspera }}</p>
                     </div>
                   </div>
@@ -453,39 +455,12 @@ onMounted(cargarDashboard)
                 </div>
               </template>
               <template v-else>
-                <ul class="space-y-3">
-                  <li
-                    v-for="nota in pendientes"
-                    :key="nota.id"
-                    class="flex flex-wrap items-center gap-2 py-2 border-b border-gray-100 last:border-0 cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1"
-                    @click="router.push(`/notas/${nota.id}?desde=mi-trabajo`)"
-                  >
-                    <span class="font-mono text-sm text-gray-700">{{ nota.numero_nota_interno || nota.numero_nota }}</span>
-                    <span class="text-gray-800 flex-1 min-w-0" :title="nota.tema">{{ truncar(nota.tema, 40) }}</span>
-                    <Tag
-                      :value="labelEstado(nota.estado)"
-                      :style="{ background: colorEstado(nota.estado), color: 'white', border: 'none' }"
-                      class="!text-xs"
-                    />
-                    <span
-                      v-if="nota.fecha_limite"
-                      class="text-sm"
-                      :class="nota.atrasada ? 'text-red-600 font-medium' : 'text-gray-500'"
-                    >
-                      {{ formatoFecha(nota.fecha_limite) }}
-                      <Badge v-if="nota.atrasada" value="Atrasada" severity="danger" class="ml-1" />
-                    </span>
-                  </li>
-                </ul>
-                <div class="mt-4 pt-3 border-t border-gray-100">
-                  <Button
-                    label="Ver todo"
-                    link
-                    size="small"
-                    class="p-0 text-[#1e3a5f] font-medium"
-                    @click="irA('/mi-trabajo')"
-                  />
-                </div>
+                <TablaNotasSimple
+                  :notas="pendientes"
+                  :cargando="cargando"
+                  desde="inicio"
+                  :clickeable="true"
+                />
               </template>
             </template>
           </Card>
@@ -512,27 +487,12 @@ onMounted(cargarDashboard)
                 </div>
               </template>
               <template v-else>
-                <ul class="space-y-3">
-                  <li
-                    v-for="nota in ultimasIngresadas"
-                    :key="nota.id"
-                    class="flex flex-wrap items-center gap-2 py-2 border-b border-gray-100 last:border-0 cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1"
-                    @click="router.push(`/notas/${nota.id}?desde=notas`)"
-                  >
-                    <span class="font-mono text-sm text-gray-700">{{ nota.numero_nota_interno || nota.numero_nota }}</span>
-                    <span class="text-gray-800 flex-1 min-w-0" :title="nota.tema">{{ truncar(nota.tema, 40) }}</span>
-                    <span class="text-sm text-gray-500">{{ haceCuanto(nota.fecha_ingreso) }}</span>
-                  </li>
-                </ul>
-                <div class="mt-4 pt-3 border-t border-gray-100">
-                  <Button
-                    label="Ver todas"
-                    link
-                    size="small"
-                    class="p-0 text-[#1e3a5f] font-medium"
-                    @click="irA('/notas')"
-                  />
-                </div>
+                <TablaNotasSimple
+                  :notas="ultimasIngresadas"
+                  :cargando="cargando"
+                  desde="inicio"
+                  :clickeable="true"
+                />
               </template>
             </template>
           </Card>

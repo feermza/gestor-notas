@@ -9,14 +9,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { get } from '@/api/cliente'
 import { useAuthStore } from '@/stores/auth'
+import TablaNotas from '@/components/TablaNotas.vue'
 import {
-  truncar,
-  formatoFecha,
-  colorEstado,
-  labelEstado,
-  colorPrioridad,
-  labelPrioridad,
-  esAtrasada,
   LABELS_ESTADO,
   LABELS_PRIORIDAD,
 } from '@/utils/notas'
@@ -36,6 +30,9 @@ const filtroEstado = ref(null)
 const filtroPrioridad = ref(null)
 const soloAtrasadas = ref(false)
 const sinAsignar = ref(false)
+
+const paginaActual = ref(1)
+const porPagina = ref(10)
 
 // Botón "Nueva Nota": visible para ADMINISTRADOR, SUPERVISOR, OPERADOR
 const puedeCrearNota = computed(() =>
@@ -73,7 +70,7 @@ const notasFiltradas = computed(() => {
     lista = lista.filter((n) => n.prioridad === filtroPrioridad.value)
   }
   if (soloAtrasadas.value) {
-    lista = lista.filter((n) => n.atrasada ?? esAtrasada(n))
+    lista = lista.filter((n) => n.atrasada)
   }
   // Sin asignar: solo notas sin responsable
   if (sinAsignar.value) {
@@ -82,6 +79,15 @@ const notasFiltradas = computed(() => {
 
   return lista
 })
+
+const notasPaginadas = computed(() => {
+  const inicio = (paginaActual.value - 1) * porPagina.value
+  return notasFiltradas.value.slice(inicio, inicio + porPagina.value)
+})
+
+const totalPaginas = computed(() =>
+  Math.max(1, Math.ceil(notasFiltradas.value.length / porPagina.value)),
+)
 
 // Contador total
 const totalNotas = computed(() => notasFiltradas.value.length)
@@ -136,24 +142,8 @@ function aplicarQueryParams() {
   if (q.search) textoBusqueda.value = q.search
 }
 
-function irADetalle(id) {
-  const desde = sinAsignar.value ? 'sin-asignar' : 'notas'
-  router.push(`/notas/${id}?desde=${desde}`)
-}
-
 function irANueva() {
   router.push('/notas/nueva')
-}
-
-// Nombre del responsable o "Sin asignar"
-function nombreResponsable(nota) {
-  return nota.responsable?.nombre_completo || 'Sin asignar'
-}
-
-// Clase de fila: fondo rojizo si está atrasada
-function claseFila(nota) {
-  const atrasada = nota.atrasada ?? esAtrasada(nota)
-  return atrasada ? 'fila-atrasada' : ''
 }
 
 onMounted(() => {
@@ -173,6 +163,23 @@ watch(
   },
   { deep: true },
 )
+
+watch(
+  () => [
+    textoBusqueda.value,
+    filtroEstado.value,
+    filtroPrioridad.value,
+    soloAtrasadas.value,
+    sinAsignar.value,
+  ],
+  () => {
+    paginaActual.value = 1
+  },
+)
+
+watch(totalPaginas, (tp) => {
+  if (paginaActual.value > tp) paginaActual.value = tp
+})
 </script>
 
 <template>
@@ -248,120 +255,45 @@ watch(
         <ProgressBar mode="indeterminate" style="height: 4px" />
       </div>
 
-      <!-- Tabla de notas -->
-      <div v-if="!cargando" class="card rounded-xl overflow-hidden shadow-md">
-        <DataTable
-          :value="notasFiltradas"
-          :row-class="claseFila"
-          paginator
-          :rows="10"
-          :rows-per-page-options="[10, 25, 50]"
-          data-key="id"
-          striped-rows
-          responsive-layout="stack"
-          breakpoint="960px"
-          class="p-datatable-sm"
-          current-page-report-template="Mostrando {first} a {last} de {totalRecords} notas"
-        >
-          <Column field="numero_nota" header="Número" sortable>
-            <template #body="{ data }">
-              <button
-                type="button"
-                class="font-mono text-sm text-[#1e3a5f] hover:underline cursor-pointer bg-transparent border-none p-0"
-                @click="irADetalle(data.id)"
-              >
-                {{ data.numero_nota || data.numero_nota_interno || '—' }}
-              </button>
-            </template>
-          </Column>
-          <Column field="tema" header="Tema">
-            <template #body="{ data }">
-              <span v-tooltip.top="data.tema || '—'" class="block truncate max-w-[200px]">
-                {{ truncar(data.tema, 50) || '—' }}
-              </span>
-            </template>
-          </Column>
-          <Column field="remitente" header="Remitente">
-            <template #body="{ data }">
-              {{ data.remitente || '—' }}
-            </template>
-          </Column>
-          <Column field="estado" header="Estado">
-            <template #body="{ data }">
-              <Tag
-                :value="labelEstado(data.estado)"
-                :style="{
-                  background: colorEstado(data.estado),
-                  color: 'white',
-                  border: 'none',
-                }"
-                class="!text-xs"
-              />
-            </template>
-          </Column>
-          <Column field="prioridad" header="Prioridad">
-            <template #body="{ data }">
-              <Tag
-                :value="labelPrioridad(data.prioridad)"
-                :class="{ 'tag-urgente': data.prioridad === 'URGENTE' }"
-                :style="{
-                  background: colorPrioridad(data.prioridad),
-                  color: ['BAJA', 'NORMAL', 'MEDIA'].includes(data.prioridad) ? '#1e293b' : 'white',
-                  border: 'none',
-                }"
-                class="!text-xs"
-              />
-            </template>
-          </Column>
-          <Column header="Responsable">
-            <template #body="{ data }">
-              <span :class="data.responsable ? 'text-gray-800' : 'text-gray-400'">
-                {{ nombreResponsable(data) }}
-              </span>
-            </template>
-          </Column>
-          <Column field="fecha_limite" header="Fecha límite">
-            <template #body="{ data }">
-              <span
-                :class="
-                  (data.atrasada ?? esAtrasada(data)) ? 'text-red-600 font-medium' : 'text-gray-700'
-                "
-              >
-                {{ formatoFecha(data.fecha_limite) }}
-              </span>
-            </template>
-          </Column>
-          <Column header="Acciones" class="acciones-col">
-            <template #body="{ data }">
-              <Button
-                icon="pi pi-eye"
-                text
-                rounded
-                severity="secondary"
-                size="small"
-                v-tooltip.top="'Ver detalle'"
-                @click="irADetalle(data.id)"
-              />
-            </template>
-          </Column>
-          <template #empty>
-            <div class="py-8 text-center text-gray-500">
-              <i class="pi pi-inbox text-4xl mb-2 block opacity-60" />
-              <p>{{ error ? 'Error al cargar. Usá "Reintentar".' : 'No hay notas.' }}</p>
-            </div>
-          </template>
-        </DataTable>
+      <TablaNotas :notas="notasPaginadas" :cargando="cargando" desde="notas" />
 
-        <div class="p-3 border-t border-gray-100 flex justify-end">
+      <div
+        v-if="!cargando"
+        class="pie-paginacion flex items-center justify-between px-4 py-3 border border-gray-100 border-t-0 bg-white rounded-b-xl shadow-sm"
+      >
+        <span class="text-xs text-gray-600"> {{ notasFiltradas.length }} notas </span>
+        <div class="flex items-center gap-2">
           <button
             type="button"
-            @click="cargarNotas"
-            class="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-[#1e3a5f] bg-white hover:bg-[#eef2f7] transition-colors text-sm font-medium shadow-sm"
+            @click="paginaActual--"
+            :disabled="paginaActual === 1"
+            class="px-2 py-1 rounded text-sm text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
-            <i class="pi pi-refresh" />
-            Recargar
+            ‹
+          </button>
+          <span class="text-xs text-gray-500">
+            {{ paginaActual }} / {{ totalPaginas }}
+          </span>
+          <button
+            type="button"
+            @click="paginaActual++"
+            :disabled="paginaActual === totalPaginas"
+            class="px-2 py-1 rounded text-sm text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            ›
           </button>
         </div>
+      </div>
+
+      <div v-if="!cargando" class="mt-3 flex justify-end">
+        <button
+          type="button"
+          @click="cargarNotas"
+          class="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-[#1e3a5f] bg-white transition-colors text-sm font-medium shadow-sm hover:bg-[#475569] hover:text-white hover:border-[#475569]"
+        >
+          <i class="pi pi-refresh" />
+          Recargar
+        </button>
       </div>
     </div>
   </div>

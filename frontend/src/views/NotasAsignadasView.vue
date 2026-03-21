@@ -1,34 +1,22 @@
 <script setup>
 /**
- * MiTrabajoView — Vista para OPERADOR con sus notas pendientes.
- * Ruta: /mi-trabajo
+ * NotasAsignadasView — Vista para OPERADOR con sus notas pendientes.
+ * Ruta: /mis-notas
  * Tabs: Todas | Para iniciar (ASIGNADA) | En proceso | En espera
- * Cards simples (no DataTable), ordenadas por prioridad.
  */
 import { ref, computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { get } from '@/api/cliente'
-import {
-  colorEstado,
-  labelEstado,
-  haceCuanto,
-} from '@/utils/notas'
+import TablaNotasSimple from '@/components/TablaNotasSimple.vue'
 
-const router = useRouter()
 const route = useRoute()
 
-// Estado
 const cargando = ref(true)
 const error = ref(null)
 const notas = ref([])
-
-// Tab activo: 'todas' | 'ASIGNADA' | 'EN_PROCESO' | 'EN_ESPERA'
 const tabActivo = ref('todas')
-
-// Buscador simple
 const textoBusqueda = ref('')
 
-// Ordenar por prioridad: URGENTE, ALTA, NORMAL, BAJA
 const ordenPrioridad = { URGENTE: 0, ALTA: 1, NORMAL: 2, MEDIA: 2, BAJA: 3 }
 function ordenarPorPrioridad(lista) {
   return [...lista].sort((a, b) => {
@@ -38,16 +26,13 @@ function ordenarPorPrioridad(lista) {
   })
 }
 
-// Notas filtradas por tab y búsqueda
 const notasFiltradas = computed(() => {
   let lista = notas.value
 
-  // Filtro por tab
   if (tabActivo.value !== 'todas') {
     lista = lista.filter((n) => n.estado === tabActivo.value)
   }
 
-  // Búsqueda por número o tema
   const texto = (textoBusqueda.value || '').trim().toLowerCase()
   if (texto) {
     lista = lista.filter(
@@ -61,7 +46,6 @@ const notasFiltradas = computed(() => {
   return ordenarPorPrioridad(lista)
 })
 
-// Contador total
 const totalNotas = computed(() => notasFiltradas.value.length)
 
 async function cargarPendientes() {
@@ -78,7 +62,6 @@ async function cargarPendientes() {
   }
 }
 
-// Preactivar tab según query param ?estado
 onMounted(() => {
   const estadoQuery = route.query.estado
   if (estadoQuery && ['ASIGNADA', 'EN_PROCESO', 'EN_ESPERA'].includes(estadoQuery)) {
@@ -89,14 +72,14 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="mi-trabajo min-h-full" style="background-color: #eef2f7">
+  <div class="notas-asignadas min-h-full" style="background-color: #eef2f7">
     <div class="p-4 md:p-6">
-      <!-- Título con contador -->
       <header class="mb-6">
-        <h1 class="text-2xl md:text-3xl font-bold text-[#1e3a5f]">Mi Trabajo ({{ totalNotas }})</h1>
+        <h1 class="text-2xl md:text-3xl font-bold text-[#1e3a5f]">
+          Notas Asignadas ({{ totalNotas }})
+        </h1>
       </header>
 
-      <!-- Error -->
       <div
         v-if="error"
         class="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700 text-sm flex items-center justify-between gap-2"
@@ -105,7 +88,6 @@ onMounted(() => {
         <Button label="Reintentar" icon="pi pi-refresh" size="small" @click="cargarPendientes" />
       </div>
 
-      <!-- Buscador simple -->
       <div class="mb-4">
         <div class="relative max-w-md">
           <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -118,7 +100,6 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Tabs (botones toggle) -->
       <div class="flex flex-wrap gap-2 mb-6">
         <button
           type="button"
@@ -170,63 +151,31 @@ onMounted(() => {
         </button>
       </div>
 
-      <!-- Loading -->
       <div v-if="cargando" class="flex justify-center py-12">
         <ProgressBar mode="indeterminate" style="height: 4px; width: 100%; max-width: 400px" />
       </div>
 
-      <!-- Lista de notas (cards) -->
-      <div v-else class="space-y-4">
+      <div v-else>
         <template v-if="notasFiltradas.length === 0">
           <div class="py-12 text-center text-gray-500 bg-white rounded-lg shadow-sm">
             <i class="pi pi-inbox text-4xl mb-2 block opacity-60" />
             <p>No hay notas en esta categoría.</p>
           </div>
         </template>
-        <div
-          v-for="nota in notasFiltradas"
-          :key="nota.id"
-          class="bg-white rounded-lg p-4 shadow-sm border-l-4"
-          :style="{ borderLeftColor: colorEstado(nota.estado) }"
-        >
-          <div class="flex justify-between items-start">
-            <div>
-              <p class="font-mono text-sm text-[#1e3a5f] font-bold">
-                {{ nota.numero_nota || nota.numero_nota_interno || '—' }}
-              </p>
-              <p class="font-semibold text-gray-800 mt-1">{{ nota.tema || '—' }}</p>
-              <p class="text-sm text-gray-500 mt-1 flex items-center gap-1">
-                <i class="pi pi-flag text-xs" />
-                {{ nota.tarea_asignada || 'Sin tarea asignada' }}
-              </p>
-            </div>
-            <div class="flex flex-col items-end gap-2">
-              <span
-                class="px-2 py-1 rounded-full text-xs text-white font-medium"
-                :style="{ backgroundColor: colorEstado(nota.estado) }"
-              >
-                {{ labelEstado(nota.estado) }}
-              </span>
-              <span class="text-xs text-gray-400">{{ haceCuanto(nota.fecha_ingreso) }}</span>
-            </div>
-          </div>
-          <div class="mt-3 flex justify-end">
-            <button
-              type="button"
-              class="text-sm text-[#1e3a5f] hover:underline font-medium"
-              @click="router.push(`/notas/${nota.id}?desde=mi-trabajo`)"
-            >
-              Ver detalle →
-            </button>
-          </div>
-        </div>
+        <TablaNotasSimple
+          v-else
+          :notas="notasFiltradas"
+          :cargando="cargando"
+          desde="mis-notas"
+          :clickeable="false"
+        />
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.mi-trabajo {
+.notas-asignadas {
   min-height: 100%;
 }
 </style>
