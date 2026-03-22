@@ -8,7 +8,7 @@
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { COLORES_ESTADO, LABELS_ESTADO } from '@/utils/notas'
+import BadgeEstado from '@/components/BadgeEstado.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -223,11 +223,8 @@ onMounted(() => {
                 {{ nota.tema }}
               </p>
             </div>
-            <span
-              class="px-2 py-0.5 rounded-full text-xs text-white ml-2 shrink-0"
-              :style="{ backgroundColor: COLORES_ESTADO[nota.estado] }"
-            >
-              {{ LABELS_ESTADO[nota.estado] }}
+            <span class="ml-2 shrink-0">
+              <BadgeEstado :estado="nota.estado" />
             </span>
           </div>
 

@@ -1,12 +1,9 @@
 <script setup>
 import { ref } from 'vue'
-import {
-  COLORES_ESTADO,
-  LABELS_ESTADO,
-  COLORES_PRIORIDAD,
-  haceCuanto,
-} from '@/utils/notas'
+import { COLORES_ESTADO, haceCuanto } from '@/utils/notas'
 import BtnDetalle from '@/components/BtnDetalle.vue'
+import BadgeEstado from '@/components/BadgeEstado.vue'
+import BadgePrioridad from '@/components/BadgePrioridad.vue'
 
 defineProps({
   notas: { type: Array, required: true },
@@ -55,17 +52,9 @@ const hoverId = ref(null)
         <span class="text-sm text-gray-700 truncate" :title="nota.tema">
           {{ nota.tema }}
         </span>
-        <span
-          class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-white font-medium whitespace-nowrap"
-          :style="{ backgroundColor: COLORES_ESTADO[nota.estado] }"
-        >
-          {{ LABELS_ESTADO[nota.estado] }}
-        </span>
-        <span
-          class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-white font-medium whitespace-nowrap"
-          :style="{ backgroundColor: COLORES_PRIORIDAD[nota.prioridad] }"
-        >
-          {{ nota.prioridad }}
+        <BadgeEstado :estado="nota.estado" />
+        <span class="justify-self-start">
+          <BadgePrioridad :prioridad="nota.prioridad" />
         </span>
         <span class="text-sm text-gray-600 truncate">
           {{ nota.responsable?.nombre_completo || 'Sin asignar' }}
@@ -84,8 +73,8 @@ const hoverId = ref(null)
 <style scoped>
 .tabla-header {
   display: grid;
-  grid-template-columns: 140px 1fr 110px 90px 160px 80px 120px;
-  gap: 8px;
+  grid-template-columns: 140px 1fr 100px 90px 160px 80px 120px;
+  gap: 16px;
   padding: 10px 16px;
   background: #f8fafc;
   border-bottom: 1px solid #e2e8f0;
@@ -98,8 +87,8 @@ const hoverId = ref(null)
 }
 .tabla-fila {
   display: grid;
-  grid-template-columns: 140px 1fr 110px 90px 160px 80px 120px;
-  gap: 8px;
+  grid-template-columns: 140px 1fr 100px 90px 160px 80px 120px;
+  gap: 16px;
   padding: 10px 16px;
   align-items: center;
   background: white;

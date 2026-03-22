@@ -2,14 +2,9 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { get } from '@/api/cliente'
 import BtnDetalle from '@/components/BtnDetalle.vue'
-import {
-  COLORES_ESTADO,
-  COLORES_PRIORIDAD,
-  LABELS_ESTADO,
-  truncar,
-  haceCuanto,
-  esAtrasada,
-} from '@/utils/notas'
+import BadgeEstado from '@/components/BadgeEstado.vue'
+import BadgePrioridad from '@/components/BadgePrioridad.vue'
+import { COLORES_ESTADO, truncar, haceCuanto, esAtrasada } from '@/utils/notas'
 
 const cargando = ref(true)
 const error = ref(null)
@@ -152,22 +147,11 @@ onMounted(cargarPendientes)
               >
                 {{ truncar(nota.tarea_asignada, 28) || '—' }}
               </span>
-              <span
-                class="px-2 py-0.5 rounded-full text-xs text-white font-medium text-center min-w-0 justify-self-center"
-                :style="{ backgroundColor: COLORES_ESTADO[nota.estado] }"
-              >
-                {{ LABELS_ESTADO[nota.estado] }}
+              <span class="min-w-0 justify-self-center">
+                <BadgeEstado :estado="nota.estado" />
               </span>
-              <span
-                class="px-2 py-0.5 rounded-full text-xs font-medium text-center min-w-0 justify-self-center"
-                :class="{
-                  'text-white': !['NORMAL', 'MEDIA'].includes(nota.prioridad),
-                  'text-slate-800': ['NORMAL', 'MEDIA'].includes(nota.prioridad),
-                  'tag-urgente': nota.prioridad === 'URGENTE',
-                }"
-                :style="{ backgroundColor: COLORES_PRIORIDAD[nota.prioridad] || '#64748b' }"
-              >
-                {{ nota.prioridad }}
+              <span class="min-w-0 justify-self-center">
+                <BadgePrioridad :prioridad="nota.prioridad" />
               </span>
               <span class="text-xs text-gray-600 text-right min-w-0">
                 {{ haceCuanto(nota.fecha_ingreso) }}

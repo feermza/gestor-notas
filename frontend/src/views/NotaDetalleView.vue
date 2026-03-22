@@ -4,14 +4,9 @@ import { useRoute } from 'vue-router'
 import { get, post, postFormData } from '@/api/cliente'
 import { useAuthStore } from '@/stores/auth'
 import BtnVolver from '@/components/BtnVolver.vue'
-import {
-  formatoFecha,
-  formatoFechaHora,
-  colorEstado,
-  labelEstado,
-  colorPrioridad,
-  labelPrioridad,
-} from '@/utils/notas'
+import { formatoFecha, formatoFechaHora } from '@/utils/notas'
+import BadgeEstado from '@/components/BadgeEstado.vue'
+import BadgePrioridad from '@/components/BadgePrioridad.vue'
 
 const route = useRoute()
 
@@ -401,15 +396,7 @@ watch(
           <span class="text-2xl md:text-3xl font-mono font-bold text-[#1e3a5f]">
             {{ nota.numero_nota || '—' }}
           </span>
-          <Tag
-            :value="labelEstado(nota.estado)"
-            :style="{
-              background: colorEstado(nota.estado),
-              color: 'white',
-              border: 'none',
-            }"
-            class="!text-sm"
-          />
+          <BadgeEstado :estado="nota.estado" />
         </div>
       </header>
 
@@ -587,15 +574,7 @@ watch(
               <div class="space-y-4">
                 <div>
                   <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Estado actual</p>
-                  <Tag
-                    :value="labelEstado(nota.estado)"
-                    :style="{
-                      background: colorEstado(nota.estado),
-                      color: 'white',
-                      border: 'none',
-                    }"
-                    class="!text-sm"
-                  />
+                  <BadgeEstado :estado="nota.estado" />
                 </div>
                 <div>
                   <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Responsable</p>
@@ -829,17 +808,7 @@ watch(
               <div class="space-y-3">
                 <div>
                   <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Prioridad</p>
-                  <Tag
-                    :value="labelPrioridad(nota.prioridad)"
-                    :style="{
-                      background: colorPrioridad(nota.prioridad),
-                      color: ['BAJA', 'MEDIA', 'NORMAL'].includes(nota.prioridad)
-                        ? '#1e293b'
-                        : 'white',
-                      border: 'none',
-                    }"
-                    class="!text-xs"
-                  />
+                  <BadgePrioridad :prioridad="nota.prioridad" />
                 </div>
                 <div>
                   <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Creado por</p>

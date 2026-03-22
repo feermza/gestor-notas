@@ -1,8 +1,9 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { COLORES_ESTADO, LABELS_ESTADO } from '@/utils/notas'
+import { COLORES_ESTADO } from '@/utils/notas'
 import BtnDetalle from '@/components/BtnDetalle.vue'
+import BadgeEstado from '@/components/BadgeEstado.vue'
 
 defineProps({
   notas: { type: Array, required: true },
@@ -52,12 +53,7 @@ const router = useRouter()
         <span class="text-sm text-gray-700 truncate" :title="nota.tema">
           {{ nota.tema }}
         </span>
-        <span
-          class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-white font-medium whitespace-nowrap"
-          :style="{ backgroundColor: COLORES_ESTADO[nota.estado] }"
-        >
-          {{ LABELS_ESTADO[nota.estado] }}
-        </span>
+        <BadgeEstado :estado="nota.estado" />
         <span class="flex justify-end" @click.stop>
           <BtnDetalle :nota-id="nota.id" :desde="desde" />
         </span>
@@ -70,7 +66,7 @@ const router = useRouter()
 .tabla-header {
   display: grid;
   grid-template-columns: 140px 1fr 120px 120px;
-  gap: 8px;
+  gap: 16px;
   padding: 10px 16px;
   background: #f8fafc;
   border-bottom: 1px solid #e2e8f0;
@@ -84,7 +80,7 @@ const router = useRouter()
 .tabla-fila {
   display: grid;
   grid-template-columns: 140px 1fr 120px 120px;
-  gap: 8px;
+  gap: 16px;
   padding: 10px 16px;
   align-items: center;
   background: white;
