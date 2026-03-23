@@ -6,18 +6,41 @@
  * Botón "Nueva Nota" visible para ADMINISTRADOR, SUPERVISOR, OPERADOR (no CONSULTOR).
  */
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
+import { useToast } from 'primevue/usetoast'
 import { get } from '@/api/cliente'
 import { useAuthStore } from '@/stores/auth'
 import TablaNotas from '@/components/TablaNotas.vue'
+import BtnVolver from '@/components/BtnVolver.vue'
+import NuevaNotaModal from '@/components/NuevaNotaModal.vue'
 import {
   LABELS_ESTADO,
   LABELS_PRIORIDAD,
 } from '@/utils/notas'
 
-const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const toast = useToast()
+
+const mostrarModalNota = ref(false)
+const nuevaNotaModalRef = ref(null)
+
+const filtroEstadoBloqueado = computed(() => !!route.query.estado)
+
+function mostrarToastExito(mensaje) {
+  toast.add({
+    severity: 'success',
+    summary: 'Éxito',
+    detail: mensaje,
+    life: 3500,
+  })
+}
+
+async function onNotaGuardada() {
+  mostrarModalNota.value = false
+  mostrarToastExito('Nota creada correctamente')
+  await cargarNotas()
+}
 
 // Estado de carga y error
 const cargando = ref(true)
@@ -106,7 +129,9 @@ const tituloVista = computed(() => {
 
 function limpiarFiltros() {
   textoBusqueda.value = ''
-  filtroEstado.value = null
+  if (!filtroEstadoBloqueado.value) {
+    filtroEstado.value = null
+  }
   filtroPrioridad.value = null
   soloAtrasadas.value = false
   sinAsignar.value = false
@@ -140,10 +165,6 @@ function aplicarQueryParams() {
   if (q.atrasadas === 'true') soloAtrasadas.value = true
   if (q.sin_asignar === 'true') sinAsignar.value = true
   if (q.search) textoBusqueda.value = q.search
-}
-
-function irANueva() {
-  router.push('/notas/nueva')
 }
 
 onMounted(() => {
@@ -187,6 +208,9 @@ watch(totalPaginas, (tp) => {
     <div class="p-4 md:p-6">
       <!-- Título dinámico con contador -->
       <header class="mb-6">
+        <div v-if="filtroEstadoBloqueado" class="mb-3">
+          <BtnVolver label="Inicio" destino="/" />
+        </div>
         <h1 class="text-2xl md:text-3xl font-bold text-[#1e3a5f]">{{ tituloVista }}</h1>
       </header>
 
@@ -205,7 +229,7 @@ watch(totalPaginas, (tp) => {
           v-if="puedeCrearNota"
           label="Nueva Nota"
           icon="pi pi-plus"
-          @click="irANueva"
+          @click="mostrarModalNota = true"
           style="
             background-color: #1e3a5f !important;
             border-color: #1e3a5f !important;
@@ -222,7 +246,17 @@ watch(totalPaginas, (tp) => {
             class="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2d6a9f] focus:border-transparent"
           />
         </div>
-        <Dropdown
+        <div
+          v-if="filtroEstadoBloqueado"
+          class="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-600 min-w-[140px] w-full sm:w-[180px]"
+        >
+          <i class="pi pi-lock text-xs text-gray-400 shrink-0" />
+          <span>{{
+            opcionesEstado.find((o) => o.value === filtroEstado)?.label || filtroEstado
+          }}</span>
+        </div>
+        <Select
+          v-else
           v-model="filtroEstado"
           :options="opcionesEstado"
           option-label="label"
@@ -295,6 +329,48 @@ watch(totalPaginas, (tp) => {
           Recargar
         </button>
       </div>
+
+      <Dialog
+        v-model:visible="mostrarModalNota"
+        modal
+        header="Nueva Nota"
+        :style="{ width: '700px', maxHeight: '90vh' }"
+        :content-style="{ overflowY: 'auto', padding: '1.5rem' }"
+        :breakpoints="{ '768px': '95vw' }"
+        @show="nuevaNotaModalRef?.resetFormulario()"
+        @hide="mostrarModalNota = false"
+      >
+        <NuevaNotaModal
+          ref="nuevaNotaModalRef"
+          @guardado="onNotaGuardada"
+          @cancelar="mostrarModalNota = false"
+        />
+        <template #footer>
+          <div class="flex justify-end gap-3 px-2 py-2">
+            <Button
+              label="Cancelar"
+              @click="mostrarModalNota = false"
+              style="
+                background: transparent;
+                border: 2px solid white;
+                color: #1e3a5f;
+                font-weight: 500;
+              "
+            />
+            <Button
+              label="Guardar"
+              icon="pi pi-check"
+              :loading="!!nuevaNotaModalRef?.enviando"
+              @click="nuevaNotaModalRef?.guardar()"
+              style="
+                background-color: #1e3a5f;
+                border-color: #1e3a5f;
+                color: white;
+              "
+            />
+          </div>
+        </template>
+      </Dialog>
     </div>
   </div>
 </template>

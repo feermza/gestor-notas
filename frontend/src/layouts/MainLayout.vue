@@ -5,9 +5,10 @@
  * OPERADOR: Inicio, Asignadas, General
  * CONSULTOR: Inicio, Notas
  */
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { get } from '@/api/cliente'
 import BadgeEstado from '@/components/BadgeEstado.vue'
 
 const router = useRouter()
@@ -96,7 +97,13 @@ const menuItems = computed(() => {
   if (rol === 'SUPERVISOR' || rol === 'ADMINISTRADOR') {
     items.push({ type: 'section', label: 'NOTAS' })
     items.push({ label: 'General', icon: 'pi pi-list', to: '/notas' })
-    items.push({ label: 'Sin Asignar', icon: 'pi pi-inbox', to: '/notas?estado=INGRESADA' })
+    items.push({
+      label: 'Sin Asignar',
+      icon: 'pi pi-inbox',
+      to: '/notas',
+      query: { estado: 'INGRESADA' },
+      sinAsignar: true,
+    })
     // Usuarios y Administración: solo ADMINISTRADOR
     if (rol === 'ADMINISTRADOR') {
       items.push({ type: 'section', label: 'SISTEMA' })
@@ -121,12 +128,50 @@ const menuItems = computed(() => {
   return items
 })
 
-// Clase activa: comparar fullPath para links con query
+/** Destino del router-link (combina `to` + `query` del ítem). */
+function linkTo(item) {
+  if (item.type === 'section') return '/'
+  if (item.query && typeof item.to === 'string') {
+    return { path: item.to, query: item.query }
+  }
+  return item.to
+}
+
 function esActivo(item) {
-  if (route.fullPath === item.to) return true
-  // Para /notas sin query, considerar activo si path es /notas
-  if (item.to === '/notas' && route.path === '/notas' && !route.query.estado && !route.query.atrasadas && !route.query.sin_asignar) return true
-  return false
+  if (item.type === 'section') return false
+  if (item.sinAsignar) {
+    return (
+      route.path === '/notas' &&
+      (route.query.estado === 'INGRESADA' || route.query.sin_asignar === 'true')
+    )
+  }
+  if (item.to === '/notas' && !item.sinAsignar) {
+    return (
+      route.path === '/notas' &&
+      route.query.estado !== 'INGRESADA' &&
+      route.query.sin_asignar !== 'true'
+    )
+  }
+  return route.path === item.to
+}
+
+function itemMenuKey(item) {
+  if (item.type === 'section') return `section-${item.label}`
+  if (item.sinAsignar) return 'menu-sin-asignar'
+  if (typeof item.to === 'string') return item.to
+  return item.to.path || 'menu-item'
+}
+
+const mostrarScrollTop = ref(false)
+const mainContent = ref(null)
+
+function onMainContentScroll() {
+  const el = mainContent.value
+  mostrarScrollTop.value = (el?.scrollTop ?? 0) > 300
+}
+
+function scrollToTop() {
+  mainContent.value?.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 async function cerrarSesion() {
@@ -135,12 +180,22 @@ async function cerrarSesion() {
 }
 
 onMounted(() => {
-  // Cerrar y colapsar búsqueda al hacer click fuera
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.busqueda-global')) {
       cerrarBusqueda()
     }
   })
+  nextTick(() => {
+    const el = mainContent.value
+    if (el) {
+      el.addEventListener('scroll', onMainContentScroll, { passive: true })
+      onMainContentScroll()
+    }
+  })
+})
+
+onUnmounted(() => {
+  mainContent.value?.removeEventListener('scroll', onMainContentScroll)
 })
 </script>
 
@@ -280,23 +335,34 @@ onMounted(() => {
           <span class="font-semibold text-gray-800">Menú</span>
         </template>
         <nav class="flex flex-col gap-1 py-2">
-          <template v-for="item in menuItems" :key="item.to || `section-${item.label}`">
+          <template v-for="item in menuItems" :key="itemMenuKey(item)">
             <p
               v-if="item.type === 'section'"
-              class="px-3 pt-4 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider"
+              class="px-3 pt-4 pb-1 text-xs font-semibold text-[#64748b] uppercase tracking-wider"
             >
               {{ item.label }}
             </p>
             <router-link
               v-else
-              :to="item.to"
-              class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100"
-              :class="esActivo(item) ? 'bg-primario/10 font-medium' : ''"
-              style="--color-primario: var(--color-primario)"
-              @click="sidebarVisible = false"
+              :to="linkTo(item)"
+              custom
+              v-slot="{ href, navigate }"
             >
-              <i :class="item.icon"></i>
-              <span>{{ item.label }}</span>
+              <a
+                :href="href"
+                class="menu-item-lateral flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-[#d2d7e4]"
+                :class="{ activo: esActivo(item) }"
+                style="--color-primario: var(--color-primario)"
+                @click="
+                  (e) => {
+                    navigate(e)
+                    sidebarVisible = false
+                  }
+                "
+              >
+                <i :class="item.icon"></i>
+                <span>{{ item.label }}</span>
+              </a>
             </router-link>
           </template>
         </nav>
@@ -304,44 +370,77 @@ onMounted(() => {
 
       <!-- Sidebar desktop (persistente) -->
       <aside
-        class="hidden lg:flex lg:flex-col border-r border-gray-200 bg-white flex-shrink-0 transition-all duration-200"
+        class="hidden lg:flex lg:flex-col border-r border-gray-200 bg-[#eef2f7] flex-shrink-0 transition-all duration-200"
         :style="{ width: sidebarColapsado ? '64px' : '250px' }"
       >
-        <div class="p-4 border-b border-gray-100 flex items-center justify-center">
+        <div class="p-4 border-b-2 border-[#d2d7e4] flex items-center justify-center">
           <span v-show="!sidebarColapsado" class="font-semibold text-gray-800">Menú</span>
         </div>
         <nav class="flex flex-col gap-1 p-2">
-          <template v-for="item in menuItems" :key="item.to || `section-desktop-${item.label}`">
+          <template v-for="item in menuItems" :key="`desk-${itemMenuKey(item)}`">
             <p
               v-if="item.type === 'section'"
               v-show="!sidebarColapsado"
-              class="px-3 pt-4 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider"
+              class="px-3 pt-4 pb-1 text-xs font-semibold text-[#64748b] uppercase tracking-wider"
             >
               {{ item.label }}
             </p>
             <router-link
               v-else
-              :to="item.to"
-              v-tooltip.right="sidebarColapsado ? item.label : null"
-              class="flex items-center gap-3 py-2 rounded-lg transition-colors"
-              :class="[
-                sidebarColapsado ? 'justify-center px-0' : 'justify-start px-3',
-                esActivo(item) ? 'bg-gray-100 font-medium text-primario' : 'text-gray-700 hover:bg-gray-50',
-              ]"
+              :to="linkTo(item)"
+              custom
+              v-slot="{ href, navigate }"
             >
-              <i :class="item.icon"></i>
-              <span v-show="!sidebarColapsado">{{ item.label }}</span>
+              <a
+                :href="href"
+                v-tooltip.right="sidebarColapsado ? item.label : null"
+                class="menu-item-lateral flex items-center gap-3 py-2 rounded-lg transition-colors"
+                :class="[
+                  sidebarColapsado ? 'justify-center px-0' : 'justify-start px-3',
+                  { activo: esActivo(item) },
+                  !esActivo(item) ? 'text-gray-700 hover:bg-[#d2d7e4]' : '',
+                ]"
+                @click="(e) => navigate(e)"
+              >
+                <i :class="item.icon"></i>
+                <span v-show="!sidebarColapsado">{{ item.label }}</span>
+              </a>
             </router-link>
           </template>
         </nav>
       </aside>
 
       <!-- Contenido principal -->
-      <main class="flex-1 overflow-auto bg-gray-50">
+      <main ref="mainContent" class="flex-1 overflow-auto bg-gray-50">
         <div class="p-4 lg:p-6">
           <router-view />
         </div>
       </main>
     </div>
+
+    <Transition name="fade">
+      <button
+        v-if="mostrarScrollTop"
+        type="button"
+        aria-label="Volver arriba"
+        class="fixed bottom-6 right-6 z-40 w-10 h-10 rounded-full bg-[#1e3a5f] text-white flex items-center justify-center shadow-lg hover:bg-[#162d4a] transition-all duration-200 active:scale-95"
+        @click="scrollToTop"
+      >
+        <i class="pi pi-arrow-up text-sm" />
+      </button>
+    </Transition>
   </div>
 </template>
+
+<style scoped>
+.menu-item-lateral.activo {
+  background-color: #d2d7e4 !important;
+  font-weight: 600;
+  color: #1e3a5f;
+}
+aside .menu-item-lateral.activo {
+  background-color: #d2d7e4 !important;
+  color: #1e3a5f;
+  font-weight: 600;
+}
+</style>

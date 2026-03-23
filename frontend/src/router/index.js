@@ -46,16 +46,16 @@ const router = createRouter({
           name: 'notas',
           component: () => import('@/views/NotasView.vue'),
         },
-        // Detalle de nota
-        {
-          path: 'notas/:id',
-          name: 'nota-detalle',
-          component: () => import('@/views/NotaDetalleView.vue'),
-        },
         {
           path: 'notas/nueva',
           name: 'notas-nueva',
           component: () => import('@/views/NuevaNotaView.vue'),
+        },
+        // Detalle de nota (después de rutas estáticas como notas/nueva)
+        {
+          path: 'notas/:id',
+          name: 'nota-detalle',
+          component: () => import('@/views/NotaDetalleView.vue'),
         },
         {
           path: 'notas/pendientes',

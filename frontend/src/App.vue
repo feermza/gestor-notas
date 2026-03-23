@@ -62,9 +62,43 @@
   background-color: white !important;
   color: #1e293b !important;
 }
+.p-dialog-content::-webkit-scrollbar {
+  width: 6px;
+}
+.p-dialog-content::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.p-dialog-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+.p-dialog-content::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+.p-dialog-header-close,
+.p-dialog-close-button {
+  color: #64748b !important;
+}
+.p-dialog-header-close:hover,
+.p-dialog-close-button:hover {
+  background-color: #f1f5f9 !important;
+  color: #1e3a5f !important;
+}
+.p-dialog-header-close .p-icon,
+.p-dialog-close-button .p-icon {
+  color: inherit !important;
+}
 .p-dialog-footer {
   background-color: white !important;
   border-top: 1px solid #e2e8f0 !important;
+}
+
+/* ── Drawer (Sidebar móvil PrimeVue v4) ── */
+.p-drawer-content {
+  background-color: #eef2f7 !important;
+}
+.p-drawer {
+  background-color: #eef2f7 !important;
 }
 
 /* ── InputText / InputNumber ── */
@@ -162,6 +196,15 @@ textarea::placeholder {
 .slide-down-leave-to {
   opacity: 0;
   transform: translateY(-1rem);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 /* Tag prioridad URGENTE: animación de pulso */

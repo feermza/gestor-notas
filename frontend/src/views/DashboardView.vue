@@ -6,13 +6,34 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useToast } from 'primevue/usetoast'
 import { get } from '@/api/cliente'
 import { useAuthStore } from '@/stores/auth'
 import TablaNotasSimple from '@/components/TablaNotasSimple.vue'
+import NuevaNotaModal from '@/components/NuevaNotaModal.vue'
 import { esDelMesActual } from '@/utils/notas'
 
 const router = useRouter()
 const auth = useAuthStore()
+const toast = useToast()
+
+const mostrarModalNota = ref(false)
+const nuevaNotaModalRef = ref(null)
+
+function mostrarToastExito(mensaje) {
+  toast.add({
+    severity: 'success',
+    summary: 'Éxito',
+    detail: mensaje,
+    life: 3500,
+  })
+}
+
+async function onNotaGuardada() {
+  mostrarModalNota.value = false
+  mostrarToastExito('Nota creada correctamente')
+  await cargarDashboard()
+}
 
 // Rol del usuario actual
 const rol = computed(() => auth.usuario?.rol ?? null)
@@ -160,9 +181,23 @@ onMounted(cargarDashboard)
   <div class="dashboard min-h-full" style="background-color: #eef2f7">
     <div class="p-4 md:p-6">
       <!-- Título y fecha -->
-      <header class="mb-6">
-        <h1 class="text-2xl md:text-3xl font-bold text-[#1e3a5f]">Panel de Control</h1>
-        <p class="text-sm text-gray-500 mt-1">{{ fechaActual }}</p>
+      <header class="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 class="text-2xl md:text-3xl font-bold text-[#1e3a5f]">Panel de Control</h1>
+          <p class="text-sm text-gray-500 mt-1">{{ fechaActual }}</p>
+        </div>
+        <Button
+          v-if="esSupervisorOAdmin"
+          label="Nueva Nota"
+          icon="pi pi-plus"
+          @click="mostrarModalNota = true"
+          style="
+            background-color: #1e3a5f !important;
+            border-color: #1e3a5f !important;
+            color: white !important;
+            font-weight: 600;
+          "
+        />
       </header>
 
       <!-- Mensaje de error global -->
@@ -499,6 +534,48 @@ onMounted(cargarDashboard)
         </section>
       </template>
     </div>
+
+    <Dialog
+      v-model:visible="mostrarModalNota"
+      modal
+      header="Nueva Nota"
+      :style="{ width: '700px', maxHeight: '90vh' }"
+      :content-style="{ overflowY: 'auto', padding: '1.5rem' }"
+      :breakpoints="{ '768px': '95vw' }"
+      @show="nuevaNotaModalRef?.resetFormulario()"
+      @hide="mostrarModalNota = false"
+    >
+      <NuevaNotaModal
+        ref="nuevaNotaModalRef"
+        @guardado="onNotaGuardada"
+        @cancelar="mostrarModalNota = false"
+      />
+      <template #footer>
+        <div class="flex justify-end gap-3 px-2 py-2">
+          <Button
+            label="Cancelar"
+            @click="mostrarModalNota = false"
+            style="
+              background: transparent;
+              border: 2px solid white;
+              color: #1e3a5f;
+              font-weight: 500;
+            "
+          />
+          <Button
+            label="Guardar"
+            icon="pi pi-check"
+            :loading="!!nuevaNotaModalRef?.enviando"
+            @click="nuevaNotaModalRef?.guardar()"
+            style="
+              background-color: #1e3a5f;
+              border-color: #1e3a5f;
+              color: white;
+            "
+          />
+        </div>
+      </template>
+    </Dialog>
   </div>
 </template>
 
