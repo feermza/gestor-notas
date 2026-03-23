@@ -55,9 +55,10 @@ TRANSICIONES_PERMITIDAS = {
     EstadoChoices.EN_PROCESO: [
         EstadoChoices.RESUELTA,
         EstadoChoices.EN_ESPERA,
+        EstadoChoices.ASIGNADA,
         EstadoChoices.ARCHIVADA,
     ],
-    EstadoChoices.EN_ESPERA: [EstadoChoices.EN_PROCESO, EstadoChoices.ARCHIVADA],
+    EstadoChoices.EN_ESPERA: [EstadoChoices.EN_PROCESO, EstadoChoices.ASIGNADA, EstadoChoices.ARCHIVADA],
     EstadoChoices.RESUELTA: [EstadoChoices.ARCHIVADA],
 }
 

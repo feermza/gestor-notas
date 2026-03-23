@@ -7,7 +7,6 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 
 
-
 from usuarios.permissions import (
     EstaAutenticado,
     EsDirectorJefeOAdmin,
@@ -17,7 +16,14 @@ from usuarios.permissions import (
     PuedeAnularNota,
 )
 
-from .models import Nota, HistorialNota, Adjunto, Sector, EstadoChoices, TipoEventoChoices
+from .models import (
+    Nota,
+    HistorialNota,
+    Adjunto,
+    Sector,
+    EstadoChoices,
+    TipoEventoChoices,
+)
 from .serializers import (
     NotaListSerializer,
     NotaDetalleSerializer,
@@ -27,16 +33,13 @@ from .serializers import (
     SectorSerializer,
     NotaCreateSerializer,
 )
-from .utils import (
-    es_transicion_permitida,
-    crear_registro_historial
-)
+from .utils import es_transicion_permitida, crear_registro_historial
 
 
 class NotaViewSet(viewsets.ModelViewSet):
     """
     ViewSet para gestionar notas.
-    
+
     Acciones disponibles:
     - list: Lista todas las notas con filtros
     - create: Crea una nueva nota
@@ -46,32 +49,33 @@ class NotaViewSet(viewsets.ModelViewSet):
     - pendientes: Lista notas pendientes del usuario actual (acción custom)
     - atrasadas: Lista notas atrasadas (acción custom)
     """
+
     serializer_class = NotaCreateSerializer
 
     queryset = Nota.objects.all()
 
     def get_permissions(self):
         """Permisos por acción según rol."""
-        if self.action in ('list', 'retrieve'):
+        if self.action in ("list", "retrieve"):
             return [EstaAutenticado(), PuedeVerNotas()]
-        if self.action == 'create':
+        if self.action == "create":
             return [EstaAutenticado(), PuedeCrearNota()]
-        if self.action in ('update', 'partial_update'):
+        if self.action in ("update", "partial_update"):
             return [EstaAutenticado(), EsDirectorJefeOAdmin()]
-        if self.action == 'cambiar_estado':
+        if self.action == "cambiar_estado":
             return [EstaAutenticado()]
-        if self.action in ('pendientes', 'atrasadas'):
+        if self.action in ("pendientes", "atrasadas"):
             return [EstaAutenticado()]
         return [EstaAutenticado()]
 
     def get_serializer_class(self):
         """Retorna el serializer apropiado según la acción."""
-        if self.action == 'create':
+        if self.action == "create":
             return NotaCreateSerializer
-        elif self.action == 'list':
+        elif self.action == "list":
             return NotaListSerializer
         return NotaDetalleSerializer
-    
+
     def get_queryset(self):
         """
         Filtra las notas según los parámetros de consulta.
@@ -79,41 +83,41 @@ class NotaViewSet(viewsets.ModelViewSet):
         Filtros: estado, responsable, prioridad, atrasadas
         """
         user = self.request.user
-        queryset = Nota.objects.select_related('responsable', 'creado_por').all()
+        queryset = Nota.objects.select_related("responsable", "creado_por").all()
 
         # Restricción por rol: empleado solo ve asignadas o creadas por él
-        if user.is_authenticated and hasattr(user, 'puede_ver_todas_las_notas') and not user.puede_ver_todas_las_notas():
-            queryset = queryset.filter(
-                Q(responsable=user) | Q(creado_por=user)
-            )
+        if (
+            user.is_authenticated
+            and hasattr(user, "puede_ver_todas_las_notas")
+            and not user.puede_ver_todas_las_notas()
+        ):
+            queryset = queryset.filter(Q(responsable=user) | Q(creado_por=user))
 
         # Filtro por estado
-        estado = self.request.query_params.get('estado', None)
+        estado = self.request.query_params.get("estado", None)
         if estado:
             queryset = queryset.filter(estado=estado)
 
         # Filtro por responsable
-        responsable_id = self.request.query_params.get('responsable', None)
+        responsable_id = self.request.query_params.get("responsable", None)
         if responsable_id:
             queryset = queryset.filter(responsable_id=responsable_id)
 
         # Filtro por prioridad
-        prioridad = self.request.query_params.get('prioridad', None)
+        prioridad = self.request.query_params.get("prioridad", None)
         if prioridad:
             queryset = queryset.filter(prioridad=prioridad)
 
         # Filtro por notas atrasadas
-        atrasadas = self.request.query_params.get('atrasadas', None)
-        if atrasadas and atrasadas.lower() == 'true':
+        atrasadas = self.request.query_params.get("atrasadas", None)
+        if atrasadas and atrasadas.lower() == "true":
             hoy = timezone.now().date()
-            queryset = queryset.filter(
-                fecha_limite__lt=hoy
-            ).exclude(
+            queryset = queryset.filter(fecha_limite__lt=hoy).exclude(
                 estado__in=[EstadoChoices.ARCHIVADA, EstadoChoices.ANULADA]
             )
 
-        return queryset.order_by('-fecha_ingreso')
-    
+        return queryset.order_by("-fecha_ingreso")
+
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         """
@@ -132,7 +136,7 @@ class NotaViewSet(viewsets.ModelViewSet):
                 usuario=request.user,
                 tipo_evento=TipoEventoChoices.CREACION,
                 estado_nuevo=EstadoChoices.INGRESADA,
-                descripcion_cambio='Nota creada en el sistema'
+                descripcion_cambio="Nota creada en el sistema",
             )
             if nota.estado == EstadoChoices.ASIGNADA:
                 crear_registro_historial(
@@ -142,16 +146,16 @@ class NotaViewSet(viewsets.ModelViewSet):
                     estado_anterior=EstadoChoices.INGRESADA,
                     estado_nuevo=EstadoChoices.ASIGNADA,
                     responsable_nuevo=nota.responsable,
-                    descripcion_cambio='Nota asignada al momento de la creación'
+                    descripcion_cambio="Nota asignada al momento de la creación",
                 )
 
         headers = self.get_success_headers(serializer.data)
         return Response(
             NotaDetalleSerializer(nota).data,
             status=status.HTTP_201_CREATED,
-            headers=headers
+            headers=headers,
         )
-    
+
     def retrieve(self, request, *args, **kwargs):
         """
         Retorna el detalle de una nota incluyendo historial y adjuntos.
@@ -159,77 +163,94 @@ class NotaViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
-    
+
     @transaction.atomic
     def update(self, request, *args, **kwargs):
         """
         Actualiza una nota y registra los cambios en el historial.
         """
-        partial = kwargs.pop('partial', False)
+        partial = kwargs.pop("partial", False)
         instance = self.get_object()
-        
+
         # Guardar valores anteriores para el historial
         estado_anterior = instance.estado
         responsable_anterior = instance.responsable
-        
+
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
-        
+
         # Detectar cambios antes de guardar
         campos_modificados = {}
-        estado_nuevo = request.data.get('estado', estado_anterior)
-        responsable_nuevo_id = request.data.get('responsable', None)
-        
+        estado_nuevo = request.data.get("estado", estado_anterior)
+        responsable_nuevo_id = request.data.get("responsable", None)
+
         if estado_nuevo != estado_anterior:
-            campos_modificados['estado'] = {
-                'anterior': estado_anterior,
-                'nuevo': estado_nuevo
+            campos_modificados["estado"] = {
+                "anterior": estado_anterior,
+                "nuevo": estado_nuevo,
             }
-        
+
         responsable_nuevo = responsable_anterior
         if responsable_nuevo_id is not None:
-            responsable_id_anterior = responsable_anterior.id if responsable_anterior else None
+            responsable_id_anterior = (
+                responsable_anterior.id if responsable_anterior else None
+            )
             if int(responsable_nuevo_id) != responsable_id_anterior:
                 from usuarios.models import Usuario
+
                 responsable_nuevo = get_object_or_404(Usuario, id=responsable_nuevo_id)
-                campos_modificados['responsable'] = {
-                    'anterior': str(responsable_anterior) if responsable_anterior else None,
-                    'nuevo': str(responsable_nuevo)
+                campos_modificados["responsable"] = {
+                    "anterior": (
+                        str(responsable_anterior) if responsable_anterior else None
+                    ),
+                    "nuevo": str(responsable_nuevo),
                 }
-        
+
         # Guardar cambios
         self.perform_update(serializer)
-        
+
         # Refrescar instancia para obtener valores actualizados
         instance.refresh_from_db()
-        
+
         # Crear registro en historial si hay cambios
         if campos_modificados and request.user.is_authenticated:
             tipo_evento = TipoEventoChoices.ACTUALIZACION
-            if 'estado' in campos_modificados:
+            if "estado" in campos_modificados:
                 tipo_evento = TipoEventoChoices.CAMBIO_ESTADO
-            if 'responsable' in campos_modificados:
+            if "responsable" in campos_modificados:
                 if responsable_anterior:
                     tipo_evento = TipoEventoChoices.REASIGNACION
                 else:
                     tipo_evento = TipoEventoChoices.ASIGNACION
-            
+
             crear_registro_historial(
                 nota=instance,
                 usuario=request.user,
                 tipo_evento=tipo_evento,
-                estado_anterior=estado_anterior if 'estado' in campos_modificados else None,
-                estado_nuevo=instance.estado if 'estado' in campos_modificados else None,
-                responsable_anterior=responsable_anterior if 'responsable' in campos_modificados else None,
-                responsable_nuevo=instance.responsable if 'responsable' in campos_modificados else None,
+                estado_anterior=(
+                    estado_anterior if "estado" in campos_modificados else None
+                ),
+                estado_nuevo=(
+                    instance.estado if "estado" in campos_modificados else None
+                ),
+                responsable_anterior=(
+                    responsable_anterior
+                    if "responsable" in campos_modificados
+                    else None
+                ),
+                responsable_nuevo=(
+                    instance.responsable
+                    if "responsable" in campos_modificados
+                    else None
+                ),
                 descripcion_cambio=f'Actualización de campos: {", ".join(campos_modificados.keys())}',
-                campos_modificados=campos_modificados
+                campos_modificados=campos_modificados,
             )
-        
+
         return Response(NotaDetalleSerializer(instance).data)
-    
+
     @transaction.atomic
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def cambiar_estado(self, request, pk=None):
         """
         Acción custom para cambiar el estado de una nota.
@@ -238,20 +259,20 @@ class NotaViewSet(viewsets.ModelViewSet):
         nota = self.get_object()
         serializer = NotaCambioEstadoSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         estado_actual = nota.estado
-        estado_nuevo = serializer.validated_data['estado_nuevo']
-        motivo = serializer.validated_data.get('motivo', '')
-        responsable_nuevo_id = serializer.validated_data.get('responsable_nuevo', None)
-        
+        estado_nuevo = serializer.validated_data["estado_nuevo"]
+        motivo = serializer.validated_data.get("motivo", "")
+        responsable_nuevo_id = serializer.validated_data.get("responsable_nuevo", None)
+
         # Validar transición permitida (rechaza ANULADA y EN_REVISION)
         if not es_transicion_permitida(estado_actual, estado_nuevo):
             return Response(
                 {
-                    'error': 'Transición no permitida',
-                    'detalle': f'No se puede cambiar de {estado_actual} a {estado_nuevo}'
+                    "error": "Transición no permitida",
+                    "detalle": f"No se puede cambiar de {estado_actual} a {estado_nuevo}",
                 },
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # Validar motivo obligatorio (solo EN_ESPERA requiere motivo)
@@ -259,37 +280,38 @@ class NotaViewSet(viewsets.ModelViewSet):
         if estado_nuevo in estados_con_motivo and not motivo:
             return Response(
                 {
-                    'error': 'Motivo requerido',
-                    'detalle': f'El motivo es obligatorio para el estado {estado_nuevo}'
+                    "error": "Motivo requerido",
+                    "detalle": f"El motivo es obligatorio para el estado {estado_nuevo}",
                 },
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         # Validar responsable para ASIGNADA
         if estado_nuevo == EstadoChoices.ASIGNADA and not responsable_nuevo_id:
             return Response(
                 {
-                    'error': 'Responsable requerido',
-                    'detalle': 'El responsable es obligatorio para asignar una nota'
+                    "error": "Responsable requerido",
+                    "detalle": "El responsable es obligatorio para asignar una nota",
                 },
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         # Guardar valores anteriores
         responsable_anterior = nota.responsable
-        
+
         # Actualizar nota
         nota.estado = estado_nuevo
-        
+
         # Actualizar responsable si corresponde (ASIGNADA requiere responsable_nuevo)
         responsable_nuevo = None
         if responsable_nuevo_id:
             from usuarios.models import Usuario
+
             responsable_nuevo = get_object_or_404(Usuario, id=responsable_nuevo_id)
             nota.responsable = responsable_nuevo
 
         nota.save()
-        
+
         # Determinar tipo de evento
         tipo_evento = TipoEventoChoices.CAMBIO_ESTADO
         if estado_nuevo == EstadoChoices.ARCHIVADA:
@@ -298,7 +320,32 @@ class NotaViewSet(viewsets.ModelViewSet):
             tipo_evento = TipoEventoChoices.REASIGNACION
         elif responsable_nuevo_id and not responsable_anterior:
             tipo_evento = TipoEventoChoices.ASIGNACION
-        
+
+        # Construir descripción según tipo de evento
+        if tipo_evento == TipoEventoChoices.REASIGNACION:
+            nombre_anterior = (
+                responsable_anterior.nombre_completo
+                if responsable_anterior else 'Sin asignar'
+            )
+            nombre_nuevo = (
+                responsable_nuevo.nombre_completo
+                if responsable_nuevo else 'Sin asignar'
+            )
+            descripcion_cambio = f"Reasignada de {nombre_anterior} a {nombre_nuevo}"
+        elif tipo_evento == TipoEventoChoices.ASIGNACION:
+            nombre_nuevo = (
+                responsable_nuevo.nombre_completo
+                if responsable_nuevo else 'Sin asignar'
+            )
+            descripcion_cambio = f"Asignada a {nombre_nuevo}"
+        elif tipo_evento == TipoEventoChoices.ARCHIVADO:
+            descripcion_cambio = motivo if motivo else "Nota archivada"
+        else:
+            descripcion_cambio = (
+                motivo if motivo
+                else f"Cambio de estado de {estado_actual} a {estado_nuevo}"
+            )
+
         # Crear registro en historial
         if request.user.is_authenticated:
             crear_registro_historial(
@@ -308,16 +355,19 @@ class NotaViewSet(viewsets.ModelViewSet):
                 estado_anterior=estado_actual,
                 estado_nuevo=estado_nuevo,
                 responsable_anterior=responsable_anterior,
-                responsable_nuevo=responsable_nuevo if responsable_nuevo_id else responsable_anterior,
-                descripcion_cambio=motivo or f'Cambio de estado de {estado_actual} a {estado_nuevo}'
+                responsable_nuevo=(
+                    responsable_nuevo if responsable_nuevo_id
+                    else responsable_anterior
+                ),
+                descripcion_cambio=descripcion_cambio,
             )
-        
+
         return Response(
             NotaDetalleSerializer(nota).data,
             status=status.HTTP_200_OK
         )
-    
-    @action(detail=False, methods=['get'])
+
+    @action(detail=False, methods=["get"])
     def pendientes(self, request):
         """
         Lista las notas asignadas al usuario actual con estado:
@@ -328,14 +378,14 @@ class NotaViewSet(viewsets.ModelViewSet):
             estado__in=[
                 EstadoChoices.ASIGNADA,
                 EstadoChoices.EN_PROCESO,
-                EstadoChoices.EN_ESPERA
-            ]
-        ).order_by('-fecha_ingreso')
-        
+                EstadoChoices.EN_ESPERA,
+            ],
+        ).order_by("-fecha_ingreso")
+
         serializer = NotaListSerializer(queryset, many=True)
         return Response(serializer.data)
-    
-    @action(detail=False, methods=['get'])
+
+    @action(detail=False, methods=["get"])
     def atrasadas(self, request):
         """
         Lista las notas con fecha_limite < hoy y estado no en [ARCHIVADA, ANULADA].
@@ -343,19 +393,21 @@ class NotaViewSet(viewsets.ModelViewSet):
         """
         user = request.user
         hoy = timezone.now().date()
-        queryset = Nota.objects.filter(
-            fecha_limite__lt=hoy
-        ).exclude(
+        queryset = Nota.objects.filter(fecha_limite__lt=hoy).exclude(
             estado__in=[EstadoChoices.ARCHIVADA, EstadoChoices.ANULADA]
         )
-        if user.is_authenticated and hasattr(user, 'puede_ver_todas_las_notas') and not user.puede_ver_todas_las_notas():
+        if (
+            user.is_authenticated
+            and hasattr(user, "puede_ver_todas_las_notas")
+            and not user.puede_ver_todas_las_notas()
+        ):
             queryset = queryset.filter(Q(responsable=user) | Q(creado_por=user))
-        queryset = queryset.order_by('fecha_limite')
+        queryset = queryset.order_by("fecha_limite")
 
         serializer = NotaListSerializer(queryset, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=['post'], url_path='adjuntos')
+    @action(detail=True, methods=["post"], url_path="adjuntos")
     def adjuntos(self, request, pk=None):
         """
         Crea un adjunto para la nota (POST multipart con archivo).
@@ -363,7 +415,7 @@ class NotaViewSet(viewsets.ModelViewSet):
         """
         nota = self.get_object()
         data = request.data.copy()
-        data['nota'] = nota.pk
+        data["nota"] = nota.pk
         serializer = AdjuntoSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         serializer.save(
@@ -377,6 +429,7 @@ class HistorialNotaViewSet(viewsets.ReadOnlyModelViewSet):
     ViewSet de solo lectura para el historial de notas.
     Solo se ven registros de notas que el usuario puede ver.
     """
+
     queryset = HistorialNota.objects.all()
     serializer_class = HistorialNotaSerializer
     permission_classes = [EstaAutenticado, PuedeVerNotas]
@@ -385,16 +438,20 @@ class HistorialNotaViewSet(viewsets.ReadOnlyModelViewSet):
         """Filtra por nota y por visibilidad (empleado solo ve historial de sus notas)."""
         user = self.request.user
         queryset = HistorialNota.objects.select_related(
-            'nota', 'usuario', 'responsable_anterior', 'responsable_nuevo'
+            "nota", "usuario", "responsable_anterior", "responsable_nuevo"
         ).all()
-        if user.is_authenticated and hasattr(user, 'puede_ver_todas_las_notas') and not user.puede_ver_todas_las_notas():
+        if (
+            user.is_authenticated
+            and hasattr(user, "puede_ver_todas_las_notas")
+            and not user.puede_ver_todas_las_notas()
+        ):
             queryset = queryset.filter(
                 Q(nota__responsable=user) | Q(nota__creado_por=user)
             )
-        nota_id = self.request.query_params.get('nota', None)
+        nota_id = self.request.query_params.get("nota", None)
         if nota_id:
             queryset = queryset.filter(nota_id=nota_id)
-        return queryset.order_by('-fecha_hora')
+        return queryset.order_by("-fecha_hora")
 
 
 class AdjuntoViewSet(viewsets.ModelViewSet):
@@ -402,6 +459,7 @@ class AdjuntoViewSet(viewsets.ModelViewSet):
     ViewSet para gestionar adjuntos de notas.
     Solo se ven adjuntos de notas que el usuario puede ver.
     """
+
     queryset = Adjunto.objects.all()
     serializer_class = AdjuntoSerializer
     permission_classes = [EstaAutenticado, PuedeVerNotas]
@@ -409,16 +467,20 @@ class AdjuntoViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filtra por nota y por visibilidad (empleado solo ve adjuntos de sus notas)."""
         user = self.request.user
-        queryset = Adjunto.objects.select_related('nota', 'subido_por').all()
-        if user.is_authenticated and hasattr(user, 'puede_ver_todas_las_notas') and not user.puede_ver_todas_las_notas():
+        queryset = Adjunto.objects.select_related("nota", "subido_por").all()
+        if (
+            user.is_authenticated
+            and hasattr(user, "puede_ver_todas_las_notas")
+            and not user.puede_ver_todas_las_notas()
+        ):
             queryset = queryset.filter(
                 Q(nota__responsable=user) | Q(nota__creado_por=user)
             )
-        nota_id = self.request.query_params.get('nota', None)
+        nota_id = self.request.query_params.get("nota", None)
         if nota_id:
             queryset = queryset.filter(nota_id=nota_id)
-        return queryset.order_by('-fecha_subida')
-    
+        return queryset.order_by("-fecha_subida")
+
     def perform_create(self, serializer):
         """
         Asigna el usuario actual al adjunto al crearlo.
@@ -439,53 +501,55 @@ class SectorViewSet(viewsets.ModelViewSet):
     partial_update: PATCH /api/sectores/{id}/ — solo ADMINISTRADOR
     destroy: no implementado
     """
+
     serializer_class = SectorSerializer
-    http_method_names = ['get', 'post', 'put', 'patch', 'head', 'options']
+    http_method_names = ["get", "post", "put", "patch", "head", "options"]
 
     def get_permissions(self):
-        if self.action in ('list', 'retrieve'):
+        if self.action in ("list", "retrieve"):
             return [EstaAutenticado()]
-        if self.action in ('create', 'update', 'partial_update'):
+        if self.action in ("create", "update", "partial_update"):
             return [EstaAutenticado(), IsAdministrador()]
         return [EstaAutenticado()]
 
     def get_queryset(self):
-        qs = Sector.objects.all().order_by('numero')
-        activos = self.request.query_params.get('activos', '').lower() == 'true'
+        qs = Sector.objects.all().order_by("numero")
+        activos = self.request.query_params.get("activos", "").lower() == "true"
         if activos:
             qs = qs.filter(activo=True)
-        return qs.order_by('numero')
+        return qs.order_by("numero")
 
 
 # --- Reportes y auditoría (solo ADMINISTRADOR) ---
 
-@api_view(['GET'])
+
+@api_view(["GET"])
 @permission_classes([EstaAutenticado, IsAdministrador])
 def reporte_notas_por_sector(request):
     """
     GET /api/reportes/notas-por-sector/
     Devuelve lista de sectores con conteo de notas por estado.
     """
-    sectores = Sector.objects.filter(activo=True).order_by('numero')
+    sectores = Sector.objects.filter(activo=True).order_by("numero")
     resultado = []
     for sector in sectores:
         notas = Nota.objects.filter(sector_origen=sector)
-        resultado.append({
-            'sector': sector.nombre,
-            'numero': str(sector.numero),
-            'total': notas.count(),
-            'ingresadas': notas.filter(estado='INGRESADA').count(),
-            'en_proceso': notas.filter(
-                estado__in=['ASIGNADA', 'EN_PROCESO', 'EN_ESPERA']
-            ).count(),
-            'resueltas': notas.filter(
-                estado__in=['RESUELTA', 'ARCHIVADA']
-            ).count(),
-        })
+        resultado.append(
+            {
+                "sector": sector.nombre,
+                "numero": str(sector.numero),
+                "total": notas.count(),
+                "ingresadas": notas.filter(estado="INGRESADA").count(),
+                "en_proceso": notas.filter(
+                    estado__in=["ASIGNADA", "EN_PROCESO", "EN_ESPERA"]
+                ).count(),
+                "resueltas": notas.filter(estado__in=["RESUELTA", "ARCHIVADA"]).count(),
+            }
+        )
     return Response(resultado)
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([EstaAutenticado, IsAdministrador])
 def reporte_notas_por_operador(request):
     """
@@ -495,46 +559,48 @@ def reporte_notas_por_operador(request):
     from usuarios.models import Usuario
 
     operadores = Usuario.objects.filter(
-        rol__in=['OPERADOR', 'SUPERVISOR'],
+        rol__in=["OPERADOR", "SUPERVISOR"],
         is_active=True,
-    ).order_by('apellido', 'nombres')
+    ).order_by("apellido", "nombres")
     resultado = []
     for op in operadores:
         notas = Nota.objects.filter(responsable=op)
-        resultado.append({
-            'operador': op.nombre_completo,
-            'legajo': op.legajo,
-            'pendientes': notas.filter(estado='ASIGNADA').count(),
-            'en_proceso': notas.filter(
-                estado__in=['EN_PROCESO', 'EN_ESPERA']
-            ).count(),
-            'resueltas': notas.filter(
-                estado__in=['RESUELTA', 'ARCHIVADA']
-            ).count(),
-            'total': notas.count(),
-        })
+        resultado.append(
+            {
+                "operador": op.nombre_completo,
+                "legajo": op.legajo,
+                "pendientes": notas.filter(estado="ASIGNADA").count(),
+                "en_proceso": notas.filter(
+                    estado__in=["EN_PROCESO", "EN_ESPERA"]
+                ).count(),
+                "resueltas": notas.filter(estado__in=["RESUELTA", "ARCHIVADA"]).count(),
+                "total": notas.count(),
+            }
+        )
     return Response(resultado)
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([EstaAutenticado, IsAdministrador])
 def auditoria_list(request):
     """
     GET /api/auditoria/
     Devuelve los últimos 100 registros de HistorialNota.
     """
-    registros = HistorialNota.objects.select_related(
-        'nota', 'usuario'
-    ).order_by('-fecha_hora')[:100]
+    registros = HistorialNota.objects.select_related("nota", "usuario").order_by(
+        "-fecha_hora"
+    )[:100]
     resultado = []
     for r in registros:
-        resultado.append({
-            'id': r.id,
-            'fecha_hora': r.fecha_hora.isoformat() if r.fecha_hora else None,
-            'usuario': r.usuario.nombre_completo if r.usuario else '—',
-            'nota': r.nota.numero_nota if r.nota else '—',
-            'nota_id': r.nota_id if r.nota_id else None,
-            'tipo_evento': r.tipo_evento or '',
-            'descripcion_cambio': r.descripcion_cambio or '',
-        })
+        resultado.append(
+            {
+                "id": r.id,
+                "fecha_hora": r.fecha_hora.isoformat() if r.fecha_hora else None,
+                "usuario": r.usuario.nombre_completo if r.usuario else "—",
+                "nota": r.nota.numero_nota if r.nota else "—",
+                "nota_id": r.nota_id if r.nota_id else None,
+                "tipo_evento": r.tipo_evento or "",
+                "descripcion_cambio": r.descripcion_cambio or "",
+            }
+        )
     return Response(resultado)

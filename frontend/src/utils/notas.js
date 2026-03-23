@@ -144,3 +144,80 @@ export function esHoy(fechaStr) {
     d.getDate() === hoy.getDate()
   )
 }
+
+/**
+ * Acciones de detalle de nota por estado, rol y si el usuario es el responsable.
+ * @returns {{ habilitadas: string[], deshabilitadas: { accion: string, motivo: string }[] }}
+ */
+export function accionesDisponibles(estado, rol, esResponsable) {
+  const esSuperAdmin = ['SUPERVISOR', 'ADMINISTRADOR'].includes(rol)
+
+  const habilitadas = []
+  const deshabilitadas = []
+
+  if (esResponsable || esSuperAdmin) {
+    switch (estado) {
+      case 'INGRESADA':
+        if (esSuperAdmin) {
+          habilitadas.push('asignar', 'devuelta', 'archivar')
+          deshabilitadas.push({
+            accion: 'reasignar',
+            motivo: 'Solo disponible desde Asignada, En Proceso o En Espera',
+          })
+        }
+        break
+
+      case 'ASIGNADA':
+        if (esResponsable) {
+          habilitadas.push('iniciar')
+          deshabilitadas.push(
+            { accion: 'resuelta', motivo: 'Solo disponible desde En Proceso' },
+            { accion: 'en_espera', motivo: 'Solo disponible desde En Proceso' },
+            { accion: 'archivar', motivo: 'Solo disponible desde Resuelta' },
+          )
+        }
+        if (esSuperAdmin) {
+          habilitadas.push('reasignar', 'devuelta', 'archivar')
+        }
+        break
+
+      case 'EN_PROCESO':
+        if (esResponsable) {
+          habilitadas.push('resuelta', 'en_espera')
+          deshabilitadas.push(
+            { accion: 'iniciar', motivo: 'El proceso ya fue iniciado' },
+            { accion: 'archivar', motivo: 'Solo disponible desde Resuelta' },
+          )
+        }
+        if (esSuperAdmin) {
+          habilitadas.push('reasignar', 'devuelta', 'archivar')
+        }
+        break
+
+      case 'EN_ESPERA':
+        if (esResponsable) {
+          habilitadas.push('retomar')
+          deshabilitadas.push(
+            { accion: 'resuelta', motivo: 'Debés retomar el proceso primero' },
+            { accion: 'archivar', motivo: 'Solo disponible desde Resuelta' },
+          )
+        }
+        if (esSuperAdmin) {
+          habilitadas.push('reasignar', 'devuelta', 'archivar')
+        }
+        break
+
+      case 'RESUELTA':
+        habilitadas.push('archivar')
+        if (esSuperAdmin) {
+          deshabilitadas.push(
+            { accion: 'reasignar', motivo: 'No disponible en estado Resuelta' },
+            { accion: 'devuelta', motivo: 'No disponible en estado Resuelta' },
+          )
+        }
+        break
+    }
+  }
+
+  return { habilitadas, deshabilitadas }
+}

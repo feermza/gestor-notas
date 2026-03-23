@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { get, post, postFormData } from '@/api/cliente'
 import { useAuthStore } from '@/stores/auth'
 import BtnVolver from '@/components/BtnVolver.vue'
-import { formatoFecha, formatoFechaHora } from '@/utils/notas'
+import { formatoFecha, formatoFechaHora, accionesDisponibles } from '@/utils/notas'
 import BadgeEstado from '@/components/BadgeEstado.vue'
 import BadgePrioridad from '@/components/BadgePrioridad.vue'
 
@@ -92,6 +92,22 @@ const esResponsable = computed(() => {
   const idResponsable = Number(nota.value?.responsable?.id)
   return idUsuario === idResponsable
 })
+
+const acciones = computed(() => {
+  if (!nota.value) return { habilitadas: [], deshabilitadas: [] }
+  return accionesDisponibles(nota.value.estado, authStore.usuario?.rol, esResponsable.value)
+})
+
+const puedeHacer = (accion) => acciones.value.habilitadas.includes(accion)
+
+const motivoDeshabilitado = (accion) =>
+  acciones.value.deshabilitadas.find((d) => d.accion === accion)?.motivo
+
+/** Deshabilitado solo si figura en deshabilitadas y no está habilitada (habilitadas gana). */
+const estaDeshabilitado = (accion) => {
+  if (puedeHacer(accion)) return false
+  return !!acciones.value.deshabilitadas.find((d) => d.accion === accion)
+}
 
 // Iniciales del responsable para avatar
 const responsableIniciales = computed(() => {
@@ -311,6 +327,28 @@ function retomar() {
 
 function archivar() {
   ejecutarCambioEstado({ estado_nuevo: 'ARCHIVADA' })
+}
+
+function accionIniciar() {
+  iniciarProceso()
+}
+function accionResuelta() {
+  marcarResuelta()
+}
+function accionEnEspera() {
+  abrirMotivo('en_espera')
+}
+function accionRetomar() {
+  retomar()
+}
+function abrirModalAsignar() {
+  abrirAsignar('asignar')
+}
+function abrirModalReasignar() {
+  abrirAsignar('reasignar')
+}
+function accionDevuelta() {
+  abrirMotivo('devolver')
 }
 
 // Autoasignarse: solo SUPERVISOR/ADMIN cuando INGRESADA sin responsable o ASIGNADA a otro
@@ -602,7 +640,7 @@ watch(
             </template>
           </Card>
 
-          <!-- Card Acciones disponibles: lógica por estado con v-if separados para responsable y supervisor -->
+          <!-- Card Acciones disponibles (accionesDisponibles en utils/notas.js) -->
           <Card>
             <template #title>Acciones disponibles</template>
             <template #content>
@@ -610,193 +648,143 @@ watch(
                 Esta nota está archivada
               </div>
               <div v-else class="flex flex-col gap-2">
-                <!-- INGRESADA: solo supervisor/admin -->
-                <template v-if="nota.estado === 'INGRESADA'">
-                  <template v-if="esSupervisorOAdmin">
-                    <button
-                      v-if="puedeAutoasignarse"
-                      type="button"
-                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#0891b2] hover:bg-[#0e7490] transition-colors"
-                      :disabled="enviandoAccion"
-                      @click="autoasignarse"
-                    >
-                      Autoasignarse
-                    </button>
-                    <button
-                      type="button"
-                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#1e3a5f] hover:bg-[#2d4f7c] transition-colors"
-                      :disabled="enviandoAccion"
-                      @click="abrirAsignar('asignar')"
-                    >
-                      Asignar
-                    </button>
-                    <button
-                      type="button"
-                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#64748b] hover:bg-[#475569] transition-colors"
-                      :disabled="enviandoAccion"
-                      @click="archivar"
-                    >
-                      Archivar
-                    </button>
-                    <button
-                      type="button"
-                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#f97316] hover:bg-[#ea580c] transition-colors"
-                      :disabled="enviandoAccion"
-                      @click="abrirMotivo('devolver')"
-                    >
-                      Devolver al sector
-                    </button>
-                  </template>
-                </template>
-
-                <!-- ASIGNADA: responsable → Iniciar proceso; supervisor → Reasignar, Archivar, Devolver -->
-                <template v-if="nota.estado === 'ASIGNADA'">
-                  <button
-                    v-if="puedeAutoasignarse"
-                    type="button"
-                    class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#0891b2] hover:bg-[#0e7490] transition-colors"
-                    :disabled="enviandoAccion"
-                    @click="autoasignarse"
-                  >
-                    Autoasignarse
-                  </button>
-                  <button
-                    v-if="esResponsable"
-                    type="button"
-                    class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#1e3a5f] hover:bg-[#2d4f7c] transition-colors"
-                    :disabled="enviandoAccion"
-                    @click="iniciarProceso"
-                  >
-                    Iniciar proceso
-                  </button>
-                  <template v-if="esSupervisorOAdmin">
-                    <button
-                      type="button"
-                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#64748b] hover:bg-[#475569] transition-colors"
-                      :disabled="enviandoAccion"
-                      @click="abrirAsignar('reasignar')"
-                    >
-                      Reasignar
-                    </button>
-                    <button
-                      type="button"
-                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#64748b] hover:bg-[#475569] transition-colors"
-                      :disabled="enviandoAccion"
-                      @click="archivar"
-                    >
-                      Archivar
-                    </button>
-                    <button
-                      type="button"
-                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#f97316] hover:bg-[#ea580c] transition-colors"
-                      :disabled="enviandoAccion"
-                      @click="abrirMotivo('devolver')"
-                    >
-                      Devolver al sector
-                    </button>
-                  </template>
-                </template>
-
-                <!-- EN_PROCESO: responsable → Marcar resuelta, Poner en espera; supervisor → Reasignar, Archivar, Devolver -->
-                <template v-if="nota.estado === 'EN_PROCESO'">
-                  <template v-if="esResponsable">
-                    <button
-                      type="button"
-                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#059669] hover:bg-[#047857] transition-colors"
-                      :disabled="enviandoAccion"
-                      @click="marcarResuelta"
-                    >
-                      Marcar como resuelta
-                    </button>
-                    <button
-                      type="button"
-                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#d97706] hover:bg-[#b45309] transition-colors"
-                      :disabled="enviandoAccion"
-                      @click="abrirMotivo('en_espera')"
-                    >
-                      Poner en espera
-                    </button>
-                  </template>
-                  <template v-if="esSupervisorOAdmin">
-                    <button
-                      type="button"
-                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#64748b] hover:bg-[#475569] transition-colors"
-                      :disabled="enviandoAccion"
-                      @click="abrirAsignar('reasignar')"
-                    >
-                      Reasignar
-                    </button>
-                    <button
-                      type="button"
-                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#64748b] hover:bg-[#475569] transition-colors"
-                      :disabled="enviandoAccion"
-                      @click="archivar"
-                    >
-                      Archivar
-                    </button>
-                    <button
-                      type="button"
-                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#f97316] hover:bg-[#ea580c] transition-colors"
-                      :disabled="enviandoAccion"
-                      @click="abrirMotivo('devolver')"
-                    >
-                      Devolver al sector
-                    </button>
-                  </template>
-                </template>
-
-                <!-- EN_ESPERA: responsable → Retomar; supervisor → Reasignar, Archivar, Devolver -->
-                <template v-if="nota.estado === 'EN_ESPERA'">
-                  <button
-                    v-if="esResponsable"
-                    type="button"
-                    class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#1e3a5f] hover:bg-[#2d4f7c] transition-colors"
-                    :disabled="enviandoAccion"
-                    @click="retomar"
-                  >
-                    Retomar
-                  </button>
-                  <template v-if="esSupervisorOAdmin">
-                    <button
-                      type="button"
-                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#64748b] hover:bg-[#475569] transition-colors"
-                      :disabled="enviandoAccion"
-                      @click="abrirAsignar('reasignar')"
-                    >
-                      Reasignar
-                    </button>
-                    <button
-                      type="button"
-                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#64748b] hover:bg-[#475569] transition-colors"
-                      :disabled="enviandoAccion"
-                      @click="archivar"
-                    >
-                      Archivar
-                    </button>
-                    <button
-                      type="button"
-                      class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#f97316] hover:bg-[#ea580c] transition-colors"
-                      :disabled="enviandoAccion"
-                      @click="abrirMotivo('devolver')"
-                    >
-                      Devolver al sector
-                    </button>
-                  </template>
-                </template>
-
-                <!-- RESUELTA: Archivar si responsable o supervisor -->
-                <template
-                  v-if="nota.estado === 'RESUELTA' && (esResponsable || esSupervisorOAdmin)"
+                <button
+                  v-if="puedeAutoasignarse"
+                  type="button"
+                  class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#0891b2] hover:bg-[#0e7490] transition-colors"
+                  :disabled="enviandoAccion"
+                  @click="autoasignarse"
                 >
-                  <button
-                    type="button"
-                    class="w-full py-2 px-4 rounded-lg text-white font-medium bg-[#065f46] hover:bg-[#064e3b] transition-colors"
-                    :disabled="enviandoAccion"
-                    @click="archivar"
-                  >
-                    Archivar
-                  </button>
-                </template>
+                  Autoasignarse
+                </button>
+
+                <button
+                  v-if="puedeHacer('asignar') || estaDeshabilitado('asignar')"
+                  type="button"
+                  :disabled="estaDeshabilitado('asignar') || enviandoAccion"
+                  v-tooltip.left="motivoDeshabilitado('asignar')"
+                  class="w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+                  :class="
+                    puedeHacer('asignar')
+                      ? 'bg-[#6366f1] text-white hover:bg-[#4f46e5] cursor-pointer'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  "
+                  @click="puedeHacer('asignar') && abrirModalAsignar()"
+                >
+                  Asignar
+                </button>
+
+                <button
+                  v-if="puedeHacer('iniciar') || estaDeshabilitado('iniciar')"
+                  type="button"
+                  :disabled="estaDeshabilitado('iniciar') || enviandoAccion"
+                  v-tooltip.left="motivoDeshabilitado('iniciar')"
+                  class="w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+                  :class="
+                    puedeHacer('iniciar')
+                      ? 'bg-[#1e3a5f] text-white hover:bg-[#162d4a] cursor-pointer'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  "
+                  @click="puedeHacer('iniciar') && accionIniciar()"
+                >
+                  Iniciar proceso
+                </button>
+
+                <button
+                  v-if="puedeHacer('resuelta') || estaDeshabilitado('resuelta')"
+                  type="button"
+                  :disabled="estaDeshabilitado('resuelta') || enviandoAccion"
+                  v-tooltip.left="motivoDeshabilitado('resuelta')"
+                  class="w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+                  :class="
+                    puedeHacer('resuelta')
+                      ? 'bg-[#059669] text-white hover:bg-[#047857] cursor-pointer'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  "
+                  @click="puedeHacer('resuelta') && accionResuelta()"
+                >
+                  Resuelta
+                </button>
+
+                <button
+                  v-if="puedeHacer('en_espera') || estaDeshabilitado('en_espera')"
+                  type="button"
+                  :disabled="estaDeshabilitado('en_espera') || enviandoAccion"
+                  v-tooltip.left="motivoDeshabilitado('en_espera')"
+                  class="w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+                  :class="
+                    puedeHacer('en_espera')
+                      ? 'bg-[#d97706] text-white hover:bg-[#b45309] cursor-pointer'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  "
+                  @click="puedeHacer('en_espera') && accionEnEspera()"
+                >
+                  En espera
+                </button>
+
+                <button
+                  v-if="puedeHacer('retomar') || estaDeshabilitado('retomar')"
+                  type="button"
+                  :disabled="estaDeshabilitado('retomar') || enviandoAccion"
+                  v-tooltip.left="motivoDeshabilitado('retomar')"
+                  class="w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+                  :class="
+                    puedeHacer('retomar')
+                      ? 'bg-[#1e3a5f] text-white hover:bg-[#162d4a] cursor-pointer'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  "
+                  @click="puedeHacer('retomar') && accionRetomar()"
+                >
+                  Retomar
+                </button>
+
+                <button
+                  v-if="puedeHacer('reasignar') || estaDeshabilitado('reasignar')"
+                  type="button"
+                  :disabled="estaDeshabilitado('reasignar') || enviandoAccion"
+                  v-tooltip.left="motivoDeshabilitado('reasignar')"
+                  class="w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+                  :class="
+                    puedeHacer('reasignar')
+                      ? 'bg-[#475569] text-white hover:bg-[#334155] cursor-pointer'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  "
+                  @click="puedeHacer('reasignar') && abrirModalReasignar()"
+                >
+                  Reasignar
+                </button>
+
+                <button
+                  v-if="puedeHacer('devuelta') || estaDeshabilitado('devuelta')"
+                  type="button"
+                  :disabled="estaDeshabilitado('devuelta') || enviandoAccion"
+                  v-tooltip.left="motivoDeshabilitado('devuelta')"
+                  class="w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+                  :class="
+                    puedeHacer('devuelta')
+                      ? 'bg-[#f97316] text-white hover:bg-[#ea580c] cursor-pointer'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  "
+                  @click="puedeHacer('devuelta') && accionDevuelta()"
+                >
+                  Devolver al sector
+                </button>
+
+                <button
+                  v-if="puedeHacer('archivar') || estaDeshabilitado('archivar')"
+                  type="button"
+                  :disabled="estaDeshabilitado('archivar') || enviandoAccion"
+                  v-tooltip.left="motivoDeshabilitado('archivar')"
+                  class="w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+                  :class="
+                    puedeHacer('archivar')
+                      ? 'bg-[#64748b] text-white hover:bg-[#475569] cursor-pointer'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  "
+                  @click="puedeHacer('archivar') && archivar()"
+                >
+                  Archivar
+                </button>
               </div>
             </template>
           </Card>
