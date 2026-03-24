@@ -85,13 +85,12 @@ function toArray(r) {
   return Array.isArray(r) ? r : r?.results || []
 }
 
-// Ordenar por prioridad: URGENTE, ALTA, NORMAL, BAJA
-const ordenPrioridad = { URGENTE: 0, ALTA: 1, NORMAL: 2, MEDIA: 2, BAJA: 3 }
-function ordenarPorPrioridad(notas) {
+function ordenarPendientes(notas) {
   return [...notas].sort((a, b) => {
-    const pa = ordenPrioridad[a.prioridad] ?? 4
-    const pb = ordenPrioridad[b.prioridad] ?? 4
-    return pa - pb
+    const aUrgente = a.prioridad === 'URGENTE' ? 0 : 1
+    const bUrgente = b.prioridad === 'URGENTE' ? 0 : 1
+    if (aUrgente !== bUrgente) return aUrgente - bUrgente
+    return new Date(b.fecha_ingreso) - new Date(a.fecha_ingreso)
   })
 }
 
@@ -137,8 +136,8 @@ async function cargarDashboardOperador() {
   misEnProceso.value = toArray(rEnProceso).filter(esMia).length
   misEnEspera.value = toArray(rEnEspera).filter(esMia).length
 
-  const todasPendientes = ordenarPorPrioridad(toArray(rPendientes))
-  pendientes.value = todasPendientes.slice(0, 5)
+  const todasPendientes = toArray(rPendientes)
+  pendientes.value = ordenarPendientes(todasPendientes.slice(0, 5))
 }
 
 async function cargarDashboard() {
@@ -382,7 +381,7 @@ onMounted(cargarDashboard)
                   :notas="ultimasIngresadas"
                   :cargando="cargando"
                   desde="inicio"
-                  :clickeable="true"
+                  :clickeable="false"
                 />
               </template>
             </template>
@@ -494,7 +493,7 @@ onMounted(cargarDashboard)
                   :notas="pendientes"
                   :cargando="cargando"
                   desde="inicio"
-                  :clickeable="true"
+                  :clickeable="false"
                 />
               </template>
             </template>
@@ -567,11 +566,7 @@ onMounted(cargarDashboard)
             icon="pi pi-check"
             :loading="!!nuevaNotaModalRef?.enviando"
             @click="nuevaNotaModalRef?.guardar()"
-            style="
-              background-color: #1e3a5f;
-              border-color: #1e3a5f;
-              color: white;
-            "
+            style="background-color: #1e3a5f; border-color: #1e3a5f; color: white"
           />
         </div>
       </template>

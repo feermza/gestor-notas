@@ -16,6 +16,7 @@ import NuevaNotaModal from '@/components/NuevaNotaModal.vue'
 import {
   LABELS_ESTADO,
   LABELS_PRIORIDAD,
+  compareFechaIngresoDesc,
 } from '@/utils/notas'
 
 const route = useRoute()
@@ -100,7 +101,7 @@ const notasFiltradas = computed(() => {
     lista = lista.filter((n) => !n.responsable || !n.responsable.id)
   }
 
-  return lista
+  return [...lista].sort(compareFechaIngresoDesc)
 })
 
 const notasPaginadas = computed(() => {

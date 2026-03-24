@@ -83,7 +83,11 @@ class NotaViewSet(viewsets.ModelViewSet):
         Filtros: estado, responsable, prioridad, atrasadas
         """
         user = self.request.user
-        queryset = Nota.objects.select_related("responsable", "creado_por").all()
+        queryset = (
+            Nota.objects.select_related("responsable", "creado_por")
+            .all()
+            .order_by("-fecha_ingreso")
+        )
 
         # Restricción por rol: empleado solo ve asignadas o creadas por él
         if (
@@ -325,26 +329,44 @@ class NotaViewSet(viewsets.ModelViewSet):
         if tipo_evento == TipoEventoChoices.REASIGNACION:
             nombre_anterior = (
                 responsable_anterior.nombre_completo
-                if responsable_anterior else 'Sin asignar'
+                if responsable_anterior
+                else "Sin asignar"
             )
             nombre_nuevo = (
                 responsable_nuevo.nombre_completo
-                if responsable_nuevo else 'Sin asignar'
+                if responsable_nuevo
+                else "Sin asignar"
             )
             descripcion_cambio = f"Reasignada de {nombre_anterior} a {nombre_nuevo}"
         elif tipo_evento == TipoEventoChoices.ASIGNACION:
             nombre_nuevo = (
                 responsable_nuevo.nombre_completo
-                if responsable_nuevo else 'Sin asignar'
+                if responsable_nuevo
+                else "Sin asignar"
             )
             descripcion_cambio = f"Asignada a {nombre_nuevo}"
         elif tipo_evento == TipoEventoChoices.ARCHIVADO:
             descripcion_cambio = motivo if motivo else "Nota archivada"
         else:
-            descripcion_cambio = (
-                motivo if motivo
-                else f"Cambio de estado de {estado_actual} a {estado_nuevo}"
-            )
+            if estado_nuevo == EstadoChoices.EN_ESPERA:
+                descripcion_cambio = (
+                    f"Puesta en espera: {motivo}" if motivo else "Puesta en espera"
+                )
+            elif (
+                estado_nuevo == EstadoChoices.EN_PROCESO
+                and estado_actual == EstadoChoices.EN_ESPERA
+            ):
+                descripcion_cambio = "Retomada"
+            elif estado_nuevo == EstadoChoices.EN_PROCESO:
+                descripcion_cambio = "Proceso iniciado"
+            elif estado_nuevo == EstadoChoices.RESUELTA:
+                descripcion_cambio = "Marcada como resuelta"
+            else:
+                descripcion_cambio = (
+                    motivo
+                    if motivo
+                    else f"Cambio de estado de {estado_actual} a {estado_nuevo}"
+                )
 
         # Crear registro en historial
         if request.user.is_authenticated:
@@ -356,16 +378,12 @@ class NotaViewSet(viewsets.ModelViewSet):
                 estado_nuevo=estado_nuevo,
                 responsable_anterior=responsable_anterior,
                 responsable_nuevo=(
-                    responsable_nuevo if responsable_nuevo_id
-                    else responsable_anterior
+                    responsable_nuevo if responsable_nuevo_id else responsable_anterior
                 ),
                 descripcion_cambio=descripcion_cambio,
             )
 
-        return Response(
-            NotaDetalleSerializer(nota).data,
-            status=status.HTTP_200_OK
-        )
+        return Response(NotaDetalleSerializer(nota).data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"])
     def pendientes(self, request):

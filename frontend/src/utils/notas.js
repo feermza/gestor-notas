@@ -149,6 +149,36 @@ export function esHoy(fechaStr) {
  * Acciones de detalle de nota por estado, rol y si el usuario es el responsable.
  * @returns {{ habilitadas: string[], deshabilitadas: { accion: string, motivo: string }[] }}
  */
+/** Milisegundos desde epoch para fecha_ingreso (más reciente = mayor). */
+export function fechaIngresoMs(nota) {
+  const s = typeof nota === 'string' ? nota : nota?.fecha_ingreso
+  if (!s) return 0
+  const fechaLimpia = String(s).replace(/(\.\d{3})\d+/, '$1')
+  const t = new Date(fechaLimpia).getTime()
+  return Number.isNaN(t) ? 0 : t
+}
+
+/** Orden descendente por fecha de ingreso (alineado con API -fecha_ingreso). */
+export function compareFechaIngresoDesc(a, b) {
+  return fechaIngresoMs(b) - fechaIngresoMs(a)
+}
+
+const ORDEN_PRIORIDAD_SORT = { URGENTE: 0, ALTA: 1, NORMAL: 2, MEDIA: 2, BAJA: 3 }
+
+/**
+ * Prioridad más urgente primero; si empatan, mantiene criterio del backend (fecha más reciente primero).
+ */
+export function comparePrioridadLuegoFechaIngresoDesc(a, b) {
+  const pa = ORDEN_PRIORIDAD_SORT[a.prioridad] ?? 4
+  const pb = ORDEN_PRIORIDAD_SORT[b.prioridad] ?? 4
+  if (pa !== pb) return pa - pb
+  return compareFechaIngresoDesc(a, b)
+}
+
+export function ordenarNotasPrioridadLuegoFecha(lista) {
+  return [...lista].sort(comparePrioridadLuegoFechaIngresoDesc)
+}
+
 export function accionesDisponibles(estado, rol, esResponsable) {
   const esSuperAdmin = ['SUPERVISOR', 'ADMINISTRADOR'].includes(rol)
 

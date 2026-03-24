@@ -17,14 +17,7 @@ const notas = ref([])
 const tabActivo = ref('todas')
 const textoBusqueda = ref('')
 
-const ordenPrioridad = { URGENTE: 0, ALTA: 1, NORMAL: 2, MEDIA: 2, BAJA: 3 }
-function ordenarPorPrioridad(lista) {
-  return [...lista].sort((a, b) => {
-    const pa = ordenPrioridad[a.prioridad] ?? 4
-    const pb = ordenPrioridad[b.prioridad] ?? 4
-    return pa - pb
-  })
-}
+const ordenPrioridad = { URGENTE: 0, ALTA: 1, NORMAL: 2, BAJA: 3 }
 
 const notasFiltradas = computed(() => {
   let lista = notas.value
@@ -43,7 +36,19 @@ const notasFiltradas = computed(() => {
     )
   }
 
-  return ordenarPorPrioridad(lista)
+  return lista
+})
+
+const notasOrdenadas = computed(() => {
+  return [...notasFiltradas.value].sort((a, b) => {
+    const pa = ordenPrioridad[a.prioridad] ?? 4
+    const pb = ordenPrioridad[b.prioridad] ?? 4
+    if (pa !== pb) return pa - pb
+    // Fix microsegundos
+    const fa = new Date((a.fecha_ingreso || '').replace(/(\.\d{3})\d+/, '$1'))
+    const fb = new Date((b.fecha_ingreso || '').replace(/(\.\d{3})\d+/, '$1'))
+    return fb - fa
+  })
 })
 
 const totalNotas = computed(() => notasFiltradas.value.length)
@@ -164,7 +169,7 @@ onMounted(() => {
         </template>
         <TablaNotasSimple
           v-else
-          :notas="notasFiltradas"
+          :notas="notasOrdenadas"
           :cargando="cargando"
           desde="mis-notas"
           :clickeable="false"
