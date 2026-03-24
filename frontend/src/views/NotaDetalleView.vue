@@ -307,7 +307,7 @@ function confirmarMotivo() {
   if (acc.tipo === 'en_espera') {
     payload = { estado_nuevo: 'EN_ESPERA', motivo }
   } else {
-    payload = { estado_nuevo: 'ARCHIVADA', motivo: 'Devuelta al sector: ' + motivo }
+    payload = { estado_nuevo: 'ARCHIVADA', motivo: 'Devuelta: ' + motivo }
   }
   ejecutarCambioEstado(payload)
 }
@@ -767,7 +767,7 @@ watch(
                   "
                   @click="puedeHacer('devuelta') && accionDevuelta()"
                 >
-                  Devolver al sector
+                  Devolver
                 </button>
 
                 <button
@@ -869,7 +869,7 @@ watch(
     <!-- Dialog Motivo (EN_ESPERA, Devolver al sector) -->
     <Dialog
       v-model:visible="dialogMotivo"
-      :header="accionPendiente?.tipo === 'en_espera' ? 'Motivo de la espera' : 'Devolver al sector'"
+      :header="accionPendiente?.tipo === 'en_espera' ? 'Motivo de la espera' : 'Devolver'"
       :modal="true"
       :closable="true"
       :style="{ width: '400px' }"
