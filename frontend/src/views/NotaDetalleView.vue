@@ -65,9 +65,6 @@ const usuariosParaAsignar = computed(() =>
 
 const notaId = computed(() => route.params.id)
 
-// Origen de navegación para el botón "Volver" (?desde=mis-notas | notas | sin-asignar | inicio | pendientes)
-const origenNavegacion = ref('notas')
-
 // Sector de origen (la API puede devolver id; resolvemos con lista de sectores)
 const sectorOrigenDisplay = computed(() => {
   if (!nota.value) return '—'
@@ -226,22 +223,6 @@ async function subirAdjunto(event) {
   }
 }
 
-const destinoVolver = computed(() => {
-  if (origenNavegacion.value === 'mis-notas') return '/mis-notas'
-  if (origenNavegacion.value === 'sin-asignar') return '/notas?estado=INGRESADA'
-  if (origenNavegacion.value === 'inicio') return '/'
-  if (origenNavegacion.value === 'pendientes') return '/notas/pendientes'
-  return '/notas'
-})
-
-const labelVolver = computed(() => {
-  if (origenNavegacion.value === 'mis-notas') return 'Asignadas'
-  if (origenNavegacion.value === 'sin-asignar') return 'Sin Asignar'
-  if (origenNavegacion.value === 'inicio') return 'Inicio'
-  if (origenNavegacion.value === 'pendientes') return 'Pendientes'
-  return 'General'
-})
-
 // Cambio de estado
 async function ejecutarCambioEstado(payload) {
   enviandoAccion.value = true
@@ -381,20 +362,12 @@ async function autoasignarse() {
 }
 
 onMounted(() => {
-  origenNavegacion.value = route.query.desde || 'notas'
   Promise.all([cargarNota(), cargarSectores(), cargarUsuarios()])
 })
 
 watch(notaId, (nuevo) => {
   if (nuevo) cargarNota()
 })
-
-watch(
-  () => route.query.desde,
-  (desde) => {
-    origenNavegacion.value = desde || 'notas'
-  },
-)
 </script>
 
 <template>
@@ -426,7 +399,7 @@ watch(
       <header class="mb-6">
         <!-- Back navigation -->
         <div class="mb-3">
-          <BtnVolver :label="labelVolver" :destino="destinoVolver" />
+          <BtnVolver label="Volver" />
         </div>
 
         <!-- Título principal -->

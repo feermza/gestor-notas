@@ -165,13 +165,16 @@ function itemMenuKey(item) {
 const mostrarScrollTop = ref(false)
 const mainContent = ref(null)
 
-function onMainContentScroll() {
+function updateMostrarScrollTop() {
   const el = mainContent.value
-  mostrarScrollTop.value = (el?.scrollTop ?? 0) > 300
+  mostrarScrollTop.value = (el?.scrollTop ?? 0) > 300 || window.scrollY > 300
 }
 
 function scrollToTop() {
-  mainContent.value?.scrollTo({ top: 0, behavior: 'smooth' })
+  if (mainContent.value) {
+    mainContent.value.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 async function cerrarSesion() {
@@ -188,14 +191,16 @@ onMounted(() => {
   nextTick(() => {
     const el = mainContent.value
     if (el) {
-      el.addEventListener('scroll', onMainContentScroll, { passive: true })
-      onMainContentScroll()
+      el.addEventListener('scroll', updateMostrarScrollTop, { passive: true })
     }
+    window.addEventListener('scroll', updateMostrarScrollTop, { passive: true })
+    updateMostrarScrollTop()
   })
 })
 
 onUnmounted(() => {
-  mainContent.value?.removeEventListener('scroll', onMainContentScroll)
+  mainContent.value?.removeEventListener('scroll', updateMostrarScrollTop)
+  window.removeEventListener('scroll', updateMostrarScrollTop)
 })
 </script>
 

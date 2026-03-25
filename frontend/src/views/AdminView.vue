@@ -3,7 +3,7 @@
  * AdminView — Panel de administración con reportes y auditoría.
  * Solo visible para ADMINISTRADOR.
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { get } from '@/api/cliente'
 import { haceCuanto, formatoFechaHora } from '@/utils/notas'
@@ -86,8 +86,24 @@ function seleccionarTab(tab) {
   }
 }
 
-onMounted(() => {
-  cargarReportes()
+function irANota(notaId) {
+  sessionStorage.setItem(
+    'admin-auditoria-scroll',
+    String(document.documentElement.scrollTop || 0),
+  )
+  router.push(`/notas/${notaId}`)
+}
+
+onMounted(async () => {
+  await Promise.all([cargarReportes(), cargarAuditoria()])
+
+  const savedScroll = sessionStorage.getItem('admin-auditoria-scroll')
+  if (savedScroll) {
+    tabActivo.value = 'auditoria'
+    await nextTick()
+    document.documentElement.scrollTop = parseInt(savedScroll, 10) || 0
+    sessionStorage.removeItem('admin-auditoria-scroll')
+  }
 })
 </script>
 
@@ -128,7 +144,10 @@ onMounted(() => {
         </button>
       </div>
 
-      <div v-if="error" class="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700 text-sm">
+      <div
+        v-if="error"
+        class="mb-6 rounded-lg bg-red-50 border border-red-200 p-4 text-red-700 text-sm"
+      >
         {{ error }}
       </div>
 
@@ -145,7 +164,7 @@ onMounted(() => {
               <h2 class="text-lg font-semibold text-[#1e3a5f]">Notas por sector</h2>
             </div>
             <div class="p-4 overflow-x-auto">
-              <table class="w-full text-sm">
+              <table class="w-full text-sm tabla-reporte">
                 <thead>
                   <tr class="border-b border-gray-200">
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Sector</th>
@@ -158,7 +177,7 @@ onMounted(() => {
                   <tr
                     v-for="s in notasPorSector"
                     :key="s.numero + s.sector"
-                    class="border-b border-gray-100 hover:bg-gray-50"
+                    class="border-b border-gray-100"
                   >
                     <td class="py-3 px-3">
                       <div class="font-medium text-gray-800">{{ s.sector }}</div>
@@ -196,7 +215,7 @@ onMounted(() => {
               <h2 class="text-lg font-semibold text-[#1e3a5f]">Notas por operador</h2>
             </div>
             <div class="p-4 overflow-x-auto">
-              <table class="w-full text-sm">
+              <table class="w-full text-sm tabla-reporte">
                 <thead>
                   <tr class="border-b border-gray-200">
                     <th class="text-left py-2 px-3 font-medium text-gray-700">Operador</th>
@@ -210,7 +229,7 @@ onMounted(() => {
                   <tr
                     v-for="op in notasPorOperador"
                     :key="op.legajo"
-                    class="border-b border-gray-100 hover:bg-gray-50"
+                    class="border-b border-gray-100"
                   >
                     <td class="py-3 px-3">
                       <div class="font-medium text-gray-800">{{ op.operador }}</div>
@@ -280,25 +299,22 @@ onMounted(() => {
             >
               <Column header="Fecha y hora">
                 <template #body="{ data }">
-                  <span
-                    v-tooltip.top="formatoFechaHora(data.fecha_hora)"
-                    class="cursor-help"
-                  >
+                  <span v-tooltip.top="formatoFechaHora(data.fecha_hora)" class="cursor-help">
                     {{ haceCuanto(data.fecha_hora) }}
                   </span>
                 </template>
               </Column>
               <Column field="usuario" header="Usuario" />
               <Column header="Nota">
-                <template #body="{ data }">
+                <template #body="{ data: item }">
                   <span
-                    v-if="data.nota_id"
+                    v-if="item.nota_id"
                     class="font-mono text-sm text-[#1e3a5f] hover:underline cursor-pointer font-bold"
-                    @click="router.push('/notas/' + data.nota_id)"
+                    @click="irANota(item.nota_id)"
                   >
-                    {{ data.nota }}
+                    {{ item.nota }}
                   </span>
-                  <span v-else class="text-gray-500">{{ data.nota || '—' }}</span>
+                  <span v-else class="text-gray-500">{{ item.nota || '—' }}</span>
                 </template>
               </Column>
               <Column header="Acción">
@@ -326,5 +342,14 @@ onMounted(() => {
 <style scoped>
 .admin-view {
   min-height: 100%;
+}
+
+.tabla-reporte tbody tr {
+  border-left: 3px solid transparent;
+  transition: all 0.15s;
+}
+
+.tabla-reporte tbody tr:hover {
+  background: #d2d7e4;
 }
 </style>
