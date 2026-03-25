@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { COLORES_ESTADO, haceCuanto } from '@/utils/notas'
-import BtnDetalle from '@/components/BtnDetalle.vue'
 import BadgeEstado from '@/components/BadgeEstado.vue'
 import BadgePrioridad from '@/components/BadgePrioridad.vue'
 
@@ -11,6 +11,7 @@ defineProps({
   desde: { type: String, default: 'notas' },
 })
 
+const router = useRouter()
 const hoverId = ref(null)
 </script>
 
@@ -63,7 +64,13 @@ const hoverId = ref(null)
           {{ haceCuanto(nota.fecha_ingreso) }}
         </span>
         <span class="flex justify-end" @click.stop>
-          <BtnDetalle :nota-id="nota.id" :desde="desde" />
+          <img
+            src="/images/ver-detalles.png"
+            alt="Ver detalle"
+            v-tooltip.left="'Ver detalle'"
+            @click.stop="router.push(`/notas/${nota.id}?desde=${desde}`)"
+            class="w-4 h-4 cursor-pointer opacity-60 hover:opacity-100 transition-opacity duration-200"
+          />
         </span>
       </li>
     </ul>
@@ -73,7 +80,7 @@ const hoverId = ref(null)
 <style scoped>
 .tabla-header {
   display: grid;
-  grid-template-columns: 140px 1fr 100px 90px 160px 80px 120px;
+  grid-template-columns: 140px 1fr 130px 110px 160px 80px 50px;
   gap: 16px;
   padding: 10px 16px;
   background: #f8fafc;
@@ -87,7 +94,7 @@ const hoverId = ref(null)
 }
 .tabla-fila {
   display: grid;
-  grid-template-columns: 140px 1fr 100px 90px 160px 80px 120px;
+  grid-template-columns: 140px 1fr 130px 110px 160px 80px 50px;
   gap: 16px;
   padding: 10px 16px;
   align-items: center;

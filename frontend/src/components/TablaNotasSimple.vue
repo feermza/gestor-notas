@@ -2,7 +2,6 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { COLORES_ESTADO } from '@/utils/notas'
-import BtnDetalle from '@/components/BtnDetalle.vue'
 import BadgeEstado from '@/components/BadgeEstado.vue'
 
 defineProps({
@@ -55,7 +54,13 @@ const router = useRouter()
         </span>
         <BadgeEstado :estado="nota.estado" />
         <span class="flex justify-end" @click.stop>
-          <BtnDetalle :nota-id="nota.id" :desde="desde" />
+          <img
+            src="/images/ver-detalles.png"
+            alt="Ver detalle"
+            v-tooltip.left="'Ver detalle'"
+            @click.stop="router.push(`/notas/${nota.id}?desde=${desde}`)"
+            class="w-4 h-4 cursor-pointer opacity-60 hover:opacity-100 transition-opacity duration-200"
+          />
         </span>
       </li>
     </ul>

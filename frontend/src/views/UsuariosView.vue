@@ -469,10 +469,6 @@ onMounted(() => {
             Resetear contraseña
           </button>
         </div>
-        <div class="flex items-center gap-2">
-          <Checkbox v-model="form.activo" input-id="activo" :binary="true" />
-          <label for="activo" class="text-sm font-medium text-gray-700">Activo</label>
-        </div>
       </form>
       <template #footer>
         <div class="flex justify-end gap-3 px-2 py-2">
