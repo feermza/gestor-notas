@@ -224,92 +224,91 @@ onUnmounted(() => {
       </div>
 
       <!-- Barra de búsqueda global colapsable (solo visible si el usuario está autenticado) -->
-      <div v-if="auth.usuario" class="busqueda-global relative flex items-center">
+      <div v-if="auth.usuario" class="busqueda-global relative flex items-center gap-1">
         <!-- Ícono lupa siempre visible -->
         <button
           type="button"
-          class="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+          class="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors shrink-0"
           aria-label="Buscar nota"
           @click="busquedaExpandida = !busquedaExpandida"
         >
           <i class="pi pi-search text-sm" />
         </button>
 
-        <!-- Input expandible con transición -->
-        <transition
-          enter-active-class="transition-all duration-200 ease-out"
-          enter-from-class="w-0 opacity-0"
-          enter-to-class="w-64 opacity-100"
-          leave-active-class="transition-all duration-200 ease-in"
-          leave-from-class="w-64 opacity-100"
-          leave-to-class="w-0 opacity-0"
-        >
-          <div
-            v-if="busquedaExpandida"
-            class="relative overflow-hidden"
+        <!-- Ancla position:relative: input + dropdown alineados (left:0 = borde izquierdo del input) -->
+        <div class="relative">
+          <!-- Input expandible con transición -->
+          <transition
+            enter-active-class="transition-all duration-200 ease-out"
+            enter-from-class="w-0 opacity-0"
+            enter-to-class="w-64 opacity-100"
+            leave-active-class="transition-all duration-200 ease-in"
+            leave-from-class="w-64 opacity-100"
+            leave-to-class="w-0 opacity-0"
           >
-            <i
-              class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 z-10 text-sm"
-            />
-            <input
-              ref="inputBusqueda"
-              v-model="busquedaGlobal"
-              type="text"
-              placeholder="Buscar nota..."
-              class="w-64 pl-9 pr-4 py-1.5 rounded-lg text-sm bg-white/10 text-white placeholder-gray-300 border border-white/20 focus:outline-none focus:bg-white/20 transition-all"
-              @input="onBusqueda"
-              @keydown.enter="irAResultados"
-              @keydown.escape="cerrarBusqueda"
-            />
-          </div>
-        </transition>
-
-        <!-- Dropdown de resultados rápidos -->
-        <div
-          v-if="mostrarResultados && resultados.length > 0"
-          class="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-80 overflow-y-auto"
-        >
-          <div
-            v-for="nota in resultados"
-            :key="nota.id"
-            class="flex items-center justify-between px-4 py-3 hover:bg-[#d2d7e4] cursor-pointer border-b border-gray-100 last:border-0 transition-colors"
-            @click="irANota(nota.id)"
-          >
-            <div>
-              <p class="font-mono text-xs text-[#1e3a5f] font-bold">
-                {{ nota.numero_nota }}
-              </p>
-              <p class="text-sm text-gray-700 truncate max-w-xs">
-                {{ nota.tema }}
-              </p>
+            <div v-if="busquedaExpandida" class="relative w-64 overflow-hidden">
+              <i
+                class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 z-10 text-sm pointer-events-none"
+              />
+              <input
+                ref="inputBusqueda"
+                v-model="busquedaGlobal"
+                type="text"
+                placeholder="Buscar nota..."
+                class="w-full pl-9 pr-4 py-1.5 rounded-lg text-sm bg-white/10 text-white placeholder-gray-300 border border-white/20 focus:outline-none focus:bg-white/20 transition-all"
+                @input="onBusqueda"
+                @keydown.enter="irAResultados"
+                @keydown.escape="cerrarBusqueda"
+              />
             </div>
-            <span class="ml-2 shrink-0">
-              <BadgeEstado :estado="nota.estado" />
-            </span>
-          </div>
+          </transition>
 
+          <!-- Dropdown de resultados rápidos -->
           <div
-            v-if="resultados.length === 5"
-            class="px-4 py-2 text-center text-sm text-[#1e3a5f] hover:bg-gray-50 cursor-pointer font-medium"
-            @click="irAResultados"
+            v-if="busquedaExpandida && mostrarResultados && resultados.length > 0"
+            class="absolute top-full left-0 mt-1 z-50 min-w-[400px] max-w-[500px] w-[min(500px,calc(100vw-2rem))] max-h-80 overflow-y-auto overflow-x-hidden rounded-lg border border-gray-200 bg-white shadow-xl"
           >
-            Ver todos los resultados →
-          </div>
-        </div>
+            <div
+              v-for="nota in resultados"
+              :key="nota.id"
+              class="flex items-center justify-between px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0"
+              @click="irANota(nota.id)"
+            >
+              <div class="min-w-0 flex-1 mr-3">
+                <p class="font-mono text-xs font-bold text-[#1e3a5f]">
+                  {{ nota.numero_nota }}
+                </p>
+                <p class="text-sm text-gray-700 truncate">
+                  {{ nota.tema }}
+                </p>
+              </div>
+              <BadgeEstado :estado="nota.estado" />
+            </div>
 
-        <!-- Sin resultados -->
-        <div
-          v-if="
-            mostrarResultados &&
-            busquedaGlobal.length >= 2 &&
-            resultados.length === 0 &&
-            !buscando
-          "
-          class="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 px-4 py-3"
-        >
-          <p class="text-sm text-gray-500">
-            No se encontraron notas para "{{ busquedaGlobal }}"
-          </p>
+            <div
+              v-if="resultados.length === 5"
+              class="px-4 py-2 text-center text-sm text-[#1e3a5f] hover:bg-gray-50 cursor-pointer font-medium border-t border-gray-100"
+              @click="irAResultados"
+            >
+              Ver todos los resultados →
+            </div>
+          </div>
+
+          <!-- Sin resultados -->
+          <div
+            v-if="
+              busquedaExpandida &&
+              mostrarResultados &&
+              busquedaGlobal.length >= 2 &&
+              resultados.length === 0 &&
+              !buscando
+            "
+            class="absolute top-full left-0 mt-1 z-50 min-w-[400px] max-w-[500px] w-[min(500px,calc(100vw-2rem))] overflow-x-hidden rounded-lg border border-gray-200 bg-white shadow-xl px-4 py-3"
+          >
+            <p class="text-sm text-gray-500 break-words">
+              No se encontraron notas para "{{ busquedaGlobal }}"
+            </p>
+          </div>
         </div>
       </div>
 

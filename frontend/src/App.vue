@@ -220,4 +220,16 @@ textarea::placeholder {
 .tag-urgente {
   animation: pulso 1.5s ease-in-out infinite;
 }
+
+/* Scrollbar del dropdown del buscador global (navbar) */
+.busqueda-global ::-webkit-scrollbar {
+  width: 6px;
+}
+.busqueda-global ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.busqueda-global ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
 </style>
