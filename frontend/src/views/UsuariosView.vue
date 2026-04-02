@@ -6,6 +6,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { get, post, patch } from '@/api/cliente'
 import { toArray } from '@/utils/notas'
+import { useToast } from '@/composables/useToast'
 
 // Estado
 const usuarios = ref([])
@@ -13,27 +14,14 @@ const cargando = ref(true)
 const error = ref(null)
 const textoBusqueda = ref('')
 
-// Toasts personalizados
-const mensajeExito = ref('')
-const mostrarExito = ref(false)
-const mensajeError = ref('')
-const mostrarError = ref(false)
-
-function mostrarToastExito(mensaje) {
-  mensajeExito.value = mensaje
-  mostrarExito.value = true
-  setTimeout(() => {
-    mostrarExito.value = false
-  }, 3000)
-}
-
-function mostrarToastError(mensaje) {
-  mensajeError.value = mensaje
-  mostrarError.value = true
-  setTimeout(() => {
-    mostrarError.value = false
-  }, 4000)
-}
+const {
+  mensajeExito,
+  mostrarExito,
+  mensajeError,
+  mostrarError,
+  mostrarToastExito,
+  mostrarToastError,
+} = useToast()
 
 // Modal nuevo/editar
 const dialogVisible = ref(false)

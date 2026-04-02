@@ -8,6 +8,7 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usePermisos } from '@/composables/usePermisos'
 import { get } from '@/api/cliente'
 import { toArray } from '@/utils/notas'
 import BadgeEstado from '@/components/BadgeEstado.vue'
@@ -15,6 +16,7 @@ import BadgeEstado from '@/components/BadgeEstado.vue'
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const { rol } = usePermisos()
 
 const sidebarVisible = ref(false)
 const sidebarColapsado = ref(localStorage.getItem('sidebar-collapsed') === 'true')
@@ -88,14 +90,14 @@ watch(busquedaExpandida, (val) => {
 })
 
 const menuItems = computed(() => {
-  const rol = auth.usuario?.rol
+  const r = rol.value
   const items = []
 
   // Todos los roles ven Inicio
   items.push({ label: 'Inicio', icon: 'pi pi-home', to: '/' })
 
   // SUPERVISOR / ADMINISTRADOR
-  if (rol === 'SUPERVISOR' || rol === 'ADMINISTRADOR') {
+  if (r === 'SUPERVISOR' || r === 'ADMINISTRADOR') {
     items.push({ type: 'section', label: 'NOTAS' })
     items.push({ label: 'General', icon: 'pi pi-list', to: '/notas' })
     items.push({
@@ -106,7 +108,7 @@ const menuItems = computed(() => {
       sinAsignar: true,
     })
     // Usuarios y Administración: solo ADMINISTRADOR
-    if (rol === 'ADMINISTRADOR') {
+    if (r === 'ADMINISTRADOR') {
       items.push({ type: 'section', label: 'SISTEMA' })
       items.push({ label: 'Usuarios', icon: 'pi pi-users', to: '/usuarios' })
       items.push({ label: 'Sectores', icon: 'pi pi-building', to: '/sectores' })
@@ -116,7 +118,7 @@ const menuItems = computed(() => {
   }
 
   // OPERADOR
-  if (rol === 'OPERADOR') {
+  if (r === 'OPERADOR') {
     items.push({ type: 'section', label: 'NOTAS' })
     items.push({ label: 'Asignadas', icon: 'pi pi-briefcase', to: '/mis-notas' })
     items.push({ label: 'General', icon: 'pi pi-list', to: '/notas' })

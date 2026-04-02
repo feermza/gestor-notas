@@ -4,7 +4,8 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useToast } from 'primevue/usetoast'
+import { useToast as usePrimeToast } from 'primevue/usetoast'
+import { useToast } from '@/composables/useToast'
 import { get, post, postFormData } from '@/api/cliente'
 import { COLORES_PRIORIDAD, LABELS_PRIORIDAD, toArray } from '@/utils/notas'
 
@@ -15,7 +16,12 @@ const props = defineProps({
 const emit = defineEmits(['guardado', 'cancelar'])
 
 const router = useRouter()
-const toast = useToast()
+const toast = usePrimeToast()
+const {
+  mensajeExito,
+  mostrarExito,
+  mostrarToastExito,
+} = useToast()
 
 const sectores = ref([])
 const usuarios = ref([])
@@ -24,8 +30,6 @@ const cargandoUsuarios = ref(true)
 
 const enviando = ref(false)
 const errorGeneral = ref(null)
-const mensajeExito = ref('')
-const mostrarExito = ref(false)
 
 const form = ref({
   sector_origen_id: null,
@@ -257,12 +261,13 @@ async function guardar() {
       await postFormData(`/api/notas/${notaId}/adjuntos/`, fd)
     }
 
-    mensajeExito.value = form.value.responsable_id
-      ? 'Nota creada y asignada correctamente'
-      : 'Nota creada correctamente'
-    mostrarExito.value = true
+    mostrarToastExito(
+      form.value.responsable_id
+        ? 'Nota creada y asignada correctamente'
+        : 'Nota creada correctamente',
+      1500,
+    )
     await new Promise((r) => setTimeout(r, 1500))
-    mostrarExito.value = false
 
     if (props.embedPage) {
       router.push('/notas')

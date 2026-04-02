@@ -9,15 +9,15 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { get } from '@/api/cliente'
-import { useAuthStore } from '@/stores/auth'
+import { usePermisos } from '@/composables/usePermisos'
 import TablaNotas from '@/components/TablaNotas.vue'
 import BtnVolver from '@/components/BtnVolver.vue'
 import NuevaNotaModal from '@/components/NuevaNotaModal.vue'
 import { LABELS_ESTADO, LABELS_PRIORIDAD, compareFechaIngresoDesc, toArray } from '@/utils/notas'
 
 const route = useRoute()
-const auth = useAuthStore()
 const toast = useToast()
+const { puedeCrearNota } = usePermisos()
 
 const mostrarModalNota = ref(false)
 const nuevaNotaModalRef = ref(null)
@@ -55,11 +55,6 @@ const sinAsignar = ref(false)
 
 const paginaActual = ref(1)
 const porPagina = ref(10)
-
-// Botón "Nueva Nota": visible para ADMINISTRADOR, SUPERVISOR, OPERADOR
-const puedeCrearNota = computed(() =>
-  ['ADMINISTRADOR', 'SUPERVISOR', 'OPERADOR'].includes(auth.usuario?.rol),
-)
 
 // Opciones para dropdowns (estados y prioridades)
 const opcionesEstado = computed(() => {

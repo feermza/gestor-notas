@@ -9,6 +9,7 @@ import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { get } from '@/api/cliente'
 import { useAuthStore } from '@/stores/auth'
+import { usePermisos } from '@/composables/usePermisos'
 import TablaNotasSimple from '@/components/TablaNotasSimple.vue'
 import NuevaNotaModal from '@/components/NuevaNotaModal.vue'
 import { esDelMesActual, toArray, ordenarPendientesOperador } from '@/utils/notas'
@@ -16,6 +17,7 @@ import { esDelMesActual, toArray, ordenarPendientesOperador } from '@/utils/nota
 const router = useRouter()
 const auth = useAuthStore()
 const toast = useToast()
+const { esSupervisorOAdmin, esOperador } = usePermisos()
 
 const mostrarModalNota = ref(false)
 const nuevaNotaModalRef = ref(null)
@@ -34,11 +36,6 @@ async function onNotaGuardada() {
   mostrarToastExito('Nota creada correctamente')
   await cargarDashboard()
 }
-
-// Rol del usuario actual
-const rol = computed(() => auth.usuario?.rol ?? null)
-const esSupervisorOAdmin = computed(() => ['SUPERVISOR', 'ADMINISTRADOR'].includes(rol.value))
-const esOperador = computed(() => rol.value === 'OPERADOR')
 
 // Estado del dashboard
 const cargando = ref(true)

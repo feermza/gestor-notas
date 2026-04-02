@@ -2,7 +2,8 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { get, post, postFormData } from '@/api/cliente'
-import { useAuthStore } from '@/stores/auth'
+import { useToast } from '@/composables/useToast'
+import { usePermisos } from '@/composables/usePermisos'
 import BtnVolver from '@/components/BtnVolver.vue'
 import { formatoFecha, formatoFechaHora, accionesDisponibles, toArray } from '@/utils/notas'
 import BadgeEstado from '@/components/BadgeEstado.vue'
@@ -10,27 +11,14 @@ import BadgePrioridad from '@/components/BadgePrioridad.vue'
 
 const route = useRoute()
 
-// Toasts personalizados (mejor contraste)
-const mensajeExito = ref('')
-const mostrarExito = ref(false)
-const mensajeError = ref('')
-const mostrarError = ref(false)
-
-function mostrarToastExito(mensaje) {
-  mensajeExito.value = mensaje
-  mostrarExito.value = true
-  setTimeout(() => {
-    mostrarExito.value = false
-  }, 3000)
-}
-
-function mostrarToastError(mensaje) {
-  mensajeError.value = mensaje
-  mostrarError.value = true
-  setTimeout(() => {
-    mostrarError.value = false
-  }, 4000)
-}
+const {
+  mensajeExito,
+  mostrarExito,
+  mensajeError,
+  mostrarError,
+  mostrarToastExito,
+  mostrarToastError,
+} = useToast()
 
 // Estado
 const nota = ref(null)
@@ -76,23 +64,13 @@ const sectorOrigenDisplay = computed(() => {
   return s ? `${s.numero} — ${s.nombre}` : `Sector ${id}`
 })
 
-// Usuario actual (store de auth)
-const authStore = useAuthStore()
-const usuarioActual = computed(() => authStore.usuario ?? null)
+const { esSupervisorOAdmin, rol, usuarioId, esResponsableDe } = usePermisos()
 
-const esSupervisorOAdmin = computed(() =>
-  ['SUPERVISOR', 'ADMINISTRADOR'].includes(usuarioActual.value?.rol),
-)
-
-const esResponsable = computed(() => {
-  const idUsuario = Number(usuarioActual.value?.id)
-  const idResponsable = Number(nota.value?.responsable?.id)
-  return idUsuario === idResponsable
-})
+const esResponsable = computed(() => esResponsableDe(nota.value))
 
 const acciones = computed(() => {
   if (!nota.value) return { habilitadas: [], deshabilitadas: [] }
-  return accionesDisponibles(nota.value.estado, authStore.usuario?.rol, esResponsable.value)
+  return accionesDisponibles(nota.value.estado, rol.value, esResponsable.value)
 })
 
 const puedeHacer = (accion) => acciones.value.habilitadas.includes(accion)
@@ -344,12 +322,12 @@ const puedeAutoasignarse = computed(() => {
 })
 
 async function autoasignarse() {
-  if (!usuarioActual.value?.id) return
+  if (usuarioId.value == null) return
   enviandoAccion.value = true
   try {
     await post(`/api/notas/${notaId.value}/cambiar_estado/`, {
       estado_nuevo: 'ASIGNADA',
-      responsable_nuevo: usuarioActual.value.id,
+      responsable_nuevo: usuarioId.value,
     })
     mostrarToastExito('Estado actualizado correctamente')
     await cargarNota()
