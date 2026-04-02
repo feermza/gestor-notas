@@ -5,6 +5,7 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import { get, post, patch } from '@/api/cliente'
+import { toArray } from '@/utils/notas'
 
 // Estado
 const usuarios = ref([])
@@ -93,7 +94,7 @@ async function cargarUsuarios() {
   error.value = null
   try {
     const res = await get('/api/usuarios/')
-    usuarios.value = Array.isArray(res) ? res : res.results || []
+    usuarios.value = toArray(res)
   } catch (e) {
     error.value = e?.data?.detalle || e?.data?.detail || e?.message || 'Error al cargar usuarios.'
   } finally {

@@ -140,12 +140,3 @@ export async function patch(url, data) {
   }
   return response
 }
-
-/**
- * DELETE
- * @param {string} url
- * @returns {Promise<Response>}
- */
-export async function del(url) {
-  return request(url, { method: 'DELETE' })
-}

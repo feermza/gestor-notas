@@ -7,7 +7,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { get } from '@/api/cliente'
+import { toArray, ordenarPorPrioridadYFecha } from '@/utils/notas'
 import TablaNotasSimple from '@/components/TablaNotasSimple.vue'
+import BtnVolver from '@/components/BtnVolver.vue'
 
 const route = useRoute()
 
@@ -16,8 +18,6 @@ const error = ref(null)
 const notas = ref([])
 const tabActivo = ref('todas')
 const textoBusqueda = ref('')
-
-const ordenPrioridad = { URGENTE: 0, ALTA: 1, NORMAL: 2, BAJA: 3 }
 
 const notasFiltradas = computed(() => {
   let lista = notas.value
@@ -39,17 +39,7 @@ const notasFiltradas = computed(() => {
   return lista
 })
 
-const notasOrdenadas = computed(() => {
-  return [...notasFiltradas.value].sort((a, b) => {
-    const pa = ordenPrioridad[a.prioridad] ?? 4
-    const pb = ordenPrioridad[b.prioridad] ?? 4
-    if (pa !== pb) return pa - pb
-    // Fix microsegundos
-    const fa = new Date((a.fecha_ingreso || '').replace(/(\.\d{3})\d+/, '$1'))
-    const fb = new Date((b.fecha_ingreso || '').replace(/(\.\d{3})\d+/, '$1'))
-    return fb - fa
-  })
-})
+const notasOrdenadas = computed(() => ordenarPorPrioridadYFecha(notasFiltradas.value))
 
 const totalNotas = computed(() => notasFiltradas.value.length)
 
@@ -58,7 +48,7 @@ async function cargarPendientes() {
   error.value = null
   try {
     const res = await get('/api/notas/pendientes/')
-    notas.value = Array.isArray(res) ? res : res.results || []
+    notas.value = toArray(res)
   } catch (e) {
     error.value = e.data?.detalle || e.data?.error || e.message || 'Error al cargar las notas.'
     notas.value = []
@@ -80,6 +70,9 @@ onMounted(() => {
   <div class="notas-asignadas min-h-full" style="background-color: #eef2f7">
     <div class="p-4 md:p-6">
       <header class="mb-6">
+        <div v-if="route.query.estado" class="mb-3">
+          <BtnVolver label="Inicio" destino="/" />
+        </div>
         <h1 class="text-2xl md:text-3xl font-bold text-[#1e3a5f]">
           Notas Asignadas ({{ totalNotas }})
         </h1>

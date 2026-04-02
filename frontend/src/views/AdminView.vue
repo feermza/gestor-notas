@@ -6,7 +6,7 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { get } from '@/api/cliente'
-import { haceCuanto, formatoFechaHora } from '@/utils/notas'
+import { haceCuanto, formatoFechaHora, toArray } from '@/utils/notas'
 
 const router = useRouter()
 
@@ -57,8 +57,8 @@ async function cargarReportes() {
       get('/api/reportes/notas-por-sector/'),
       get('/api/reportes/notas-por-operador/'),
     ])
-    notasPorSector.value = Array.isArray(sectores) ? sectores : []
-    notasPorOperador.value = Array.isArray(operadores) ? operadores : []
+    notasPorSector.value = toArray(sectores)
+    notasPorOperador.value = toArray(operadores)
   } catch (e) {
     error.value = e?.data?.detalle || e?.data?.detail || e?.message || 'Error al cargar reportes.'
   } finally {
@@ -71,7 +71,7 @@ async function cargarAuditoria() {
   error.value = null
   try {
     const res = await get('/api/auditoria/')
-    auditoria.value = Array.isArray(res) ? res : []
+    auditoria.value = toArray(res)
   } catch (e) {
     error.value = e?.data?.detalle || e?.data?.detail || e?.message || 'Error al cargar auditoría.'
   } finally {

@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import LoginView from '@/views/LoginView.vue'
-import LoginNuevo from '@/views/LoginNuevo.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import MainLayout from '@/layouts/MainLayout.vue'
 // NotasView se carga con lazy loading
@@ -13,13 +12,6 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: LoginView,
-      meta: { public: true },
-    },
-
-    {
-      path: '/login-test',
-      name: 'login-test',
-      component: LoginNuevo,
       meta: { public: true },
     },
 
@@ -51,16 +43,15 @@ const router = createRouter({
           name: 'notas-nueva',
           component: () => import('@/views/NuevaNotaView.vue'),
         },
-        // Detalle de nota (después de rutas estáticas como notas/nueva)
+        {
+          path: 'notas/pendientes',
+          redirect: '/mis-notas',
+        },
+        // Detalle de nota (después de rutas estáticas como notas/nueva y notas/pendientes)
         {
           path: 'notas/:id',
           name: 'nota-detalle',
           component: () => import('@/views/NotaDetalleView.vue'),
-        },
-        {
-          path: 'notas/pendientes',
-          name: 'notas-pendientes',
-          component: () => import('@/views/PendientesView.vue'),
         },
         {
           path: 'notas/atrasadas',
@@ -97,7 +88,7 @@ const router = createRouter({
 })
 
 // Guardia de navegación: requiere auth o redirige a login
-router.beforeEach(async (to, from) => {
+router.beforeEach(async (to) => {
   const authStore = useAuthStore()
 
   // Si la ruta es pública (/login)

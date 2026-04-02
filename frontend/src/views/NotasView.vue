@@ -13,11 +13,7 @@ import { useAuthStore } from '@/stores/auth'
 import TablaNotas from '@/components/TablaNotas.vue'
 import BtnVolver from '@/components/BtnVolver.vue'
 import NuevaNotaModal from '@/components/NuevaNotaModal.vue'
-import {
-  LABELS_ESTADO,
-  LABELS_PRIORIDAD,
-  compareFechaIngresoDesc,
-} from '@/utils/notas'
+import { LABELS_ESTADO, LABELS_PRIORIDAD, compareFechaIngresoDesc, toArray } from '@/utils/notas'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -26,7 +22,9 @@ const toast = useToast()
 const mostrarModalNota = ref(false)
 const nuevaNotaModalRef = ref(null)
 
-const filtroEstadoBloqueado = computed(() => !!route.query.estado)
+const filtroEstadoBloqueado = computed(
+  () => !!(route.query.estado || route.query.sin_asignar || route.query.atrasadas),
+)
 
 function mostrarToastExito(mensaje) {
   toast.add({
@@ -143,7 +141,7 @@ async function cargarNotas() {
   error.value = null
   try {
     const res = await get('/api/notas/')
-    notas.value = Array.isArray(res) ? res : res.results || []
+    notas.value = toArray(res)
   } catch (e) {
     error.value = e.data?.detalle || e.data?.error || e.message || 'Error al cargar las notas.'
   } finally {
@@ -306,9 +304,7 @@ watch(totalPaginas, (tp) => {
           >
             ‹
           </button>
-          <span class="text-xs text-gray-500">
-            {{ paginaActual }} / {{ totalPaginas }}
-          </span>
+          <span class="text-xs text-gray-500"> {{ paginaActual }} / {{ totalPaginas }} </span>
           <button
             type="button"
             @click="paginaActual++"
@@ -363,11 +359,7 @@ watch(totalPaginas, (tp) => {
               icon="pi pi-check"
               :loading="!!nuevaNotaModalRef?.enviando"
               @click="nuevaNotaModalRef?.guardar()"
-              style="
-                background-color: #1e3a5f;
-                border-color: #1e3a5f;
-                color: white;
-              "
+              style="background-color: #1e3a5f; border-color: #1e3a5f; color: white"
             />
           </div>
         </template>

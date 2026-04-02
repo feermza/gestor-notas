@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { get, post, postFormData } from '@/api/cliente'
 import { useAuthStore } from '@/stores/auth'
 import BtnVolver from '@/components/BtnVolver.vue'
-import { formatoFecha, formatoFechaHora, accionesDisponibles } from '@/utils/notas'
+import { formatoFecha, formatoFechaHora, accionesDisponibles, toArray } from '@/utils/notas'
 import BadgeEstado from '@/components/BadgeEstado.vue'
 import BadgePrioridad from '@/components/BadgePrioridad.vue'
 
@@ -183,7 +183,7 @@ async function cargarNota() {
 async function cargarSectores() {
   try {
     const res = await get('/api/sectores/?activos=true')
-    sectores.value = Array.isArray(res) ? res : res.results || []
+    sectores.value = toArray(res)
   } catch {
     sectores.value = []
   }
@@ -192,7 +192,7 @@ async function cargarSectores() {
 async function cargarUsuarios() {
   try {
     const res = await get('/api/usuarios/activos/')
-    usuarios.value = Array.isArray(res) ? res : res.results || []
+    usuarios.value = toArray(res)
   } catch {
     usuarios.value = []
   }

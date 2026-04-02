@@ -6,7 +6,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { get, post, postFormData } from '@/api/cliente'
-import { COLORES_PRIORIDAD, LABELS_PRIORIDAD } from '@/utils/notas'
+import { COLORES_PRIORIDAD, LABELS_PRIORIDAD, toArray } from '@/utils/notas'
 
 const props = defineProps({
   embedPage: { type: Boolean, default: false },
@@ -157,7 +157,7 @@ async function cargarSectores() {
   cargandoSectores.value = true
   try {
     const res = await get('/api/sectores/?activos=true')
-    sectores.value = Array.isArray(res) ? res : res.results || res
+    sectores.value = toArray(res)
   } catch (_err) {
     sectores.value = []
   } finally {
@@ -169,7 +169,7 @@ async function cargarUsuarios() {
   cargandoUsuarios.value = true
   try {
     const res = await get('/api/usuarios/activos/')
-    usuarios.value = Array.isArray(res) ? res : res.results || res
+    usuarios.value = toArray(res)
   } catch (_err) {
     usuarios.value = []
   } finally {

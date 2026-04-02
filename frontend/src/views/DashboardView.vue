@@ -11,7 +11,7 @@ import { get } from '@/api/cliente'
 import { useAuthStore } from '@/stores/auth'
 import TablaNotasSimple from '@/components/TablaNotasSimple.vue'
 import NuevaNotaModal from '@/components/NuevaNotaModal.vue'
-import { esDelMesActual } from '@/utils/notas'
+import { esDelMesActual, toArray, ordenarPendientesOperador } from '@/utils/notas'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -80,20 +80,6 @@ const fechaActual = computed(() => {
   return `${dias[ahora.getDay()]}, ${ahora.getDate()} de ${meses[ahora.getMonth()]} de ${ahora.getFullYear()}`
 })
 
-// Normalizar respuesta API a array
-function toArray(r) {
-  return Array.isArray(r) ? r : r?.results || []
-}
-
-function ordenarPendientes(notas) {
-  return [...notas].sort((a, b) => {
-    const aUrgente = a.prioridad === 'URGENTE' ? 0 : 1
-    const bUrgente = b.prioridad === 'URGENTE' ? 0 : 1
-    if (aUrgente !== bUrgente) return aUrgente - bUrgente
-    return new Date(b.fecha_ingreso) - new Date(a.fecha_ingreso)
-  })
-}
-
 async function cargarDashboardSupervisor() {
   const [rIngresadas, rEnProceso, rAtrasadas, rEnEspera, rLista, rResueltas, rArchivadas] =
     await Promise.all([
@@ -137,7 +123,7 @@ async function cargarDashboardOperador() {
   misEnEspera.value = toArray(rEnEspera).filter(esMia).length
 
   const todasPendientes = toArray(rPendientes)
-  pendientes.value = ordenarPendientes(todasPendientes.slice(0, 5))
+  pendientes.value = ordenarPendientesOperador(todasPendientes.slice(0, 5))
 }
 
 async function cargarDashboard() {

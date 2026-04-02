@@ -3,6 +3,11 @@
  * Usado por DashboardView y NotasView.
  */
 
+/** Normaliza respuestas paginadas de la API a un array. */
+export function toArray(res) {
+  return Array.isArray(res) ? res : res?.results || []
+}
+
 // Colores de estado para Tags (según especificación)
 export const COLORES_ESTADO = {
   INGRESADA: '#475569',
@@ -99,22 +104,6 @@ export function haceCuanto(fechaStr) {
   return formatoFecha(fechaStr)
 }
 
-export function colorEstado(estado) {
-  return COLORES_ESTADO[estado] || '#64748b'
-}
-
-export function labelEstado(estado) {
-  return LABELS_ESTADO[estado] || estado || '—'
-}
-
-export function colorPrioridad(prioridad) {
-  return COLORES_PRIORIDAD[prioridad] || '#cbd5e1'
-}
-
-export function labelPrioridad(prioridad) {
-  return LABELS_PRIORIDAD[prioridad] || prioridad || '—'
-}
-
 /** Devuelve true si fecha_limite está en el pasado y la nota no está archivada/anulada */
 export function esAtrasada(nota) {
   if (!nota?.fecha_limite) return false
@@ -133,22 +122,6 @@ export function esDelMesActual(fechaStr) {
   return d.getFullYear() === hoy.getFullYear() && d.getMonth() === hoy.getMonth()
 }
 
-/** Devuelve true si fecha_ingreso es hoy */
-export function esHoy(fechaStr) {
-  if (!fechaStr) return false
-  const d = new Date(fechaStr)
-  const hoy = new Date()
-  return (
-    d.getFullYear() === hoy.getFullYear() &&
-    d.getMonth() === hoy.getMonth() &&
-    d.getDate() === hoy.getDate()
-  )
-}
-
-/**
- * Acciones de detalle de nota por estado, rol y si el usuario es el responsable.
- * @returns {{ habilitadas: string[], deshabilitadas: { accion: string, motivo: string }[] }}
- */
 /** Milisegundos desde epoch para fecha_ingreso (más reciente = mayor). */
 export function fechaIngresoMs(nota) {
   const s = typeof nota === 'string' ? nota : nota?.fecha_ingreso
@@ -163,22 +136,35 @@ export function compareFechaIngresoDesc(a, b) {
   return fechaIngresoMs(b) - fechaIngresoMs(a)
 }
 
-const ORDEN_PRIORIDAD_SORT = { URGENTE: 0, ALTA: 1, NORMAL: 2, MEDIA: 2, BAJA: 3 }
+/** Prioridad más urgente primero; luego fecha de ingreso descendente. */
+export function ordenarPorPrioridadYFecha(notas) {
+  const ORDEN = { URGENTE: 0, ALTA: 1, NORMAL: 2, MEDIA: 2, BAJA: 3 }
+  return [...notas].sort((a, b) => {
+    const pa = ORDEN[a.prioridad] ?? 4
+    const pb = ORDEN[b.prioridad] ?? 4
+    if (pa !== pb) return pa - pb
+    const fa = new Date((a.fecha_ingreso || '').replace(/(\.\d{3})\d+/, '$1'))
+    const fb = new Date((b.fecha_ingreso || '').replace(/(\.\d{3})\d+/, '$1'))
+    return fb - fa
+  })
+}
+
+/** URGENTE primero; el resto por fecha de ingreso descendente (panel operador). */
+export function ordenarPendientesOperador(notas) {
+  return [...notas].sort((a, b) => {
+    const aUrgente = a.prioridad === 'URGENTE' ? 0 : 1
+    const bUrgente = b.prioridad === 'URGENTE' ? 0 : 1
+    if (aUrgente !== bUrgente) return aUrgente - bUrgente
+    const fa = new Date((a.fecha_ingreso || '').replace(/(\.\d{3})\d+/, '$1'))
+    const fb = new Date((b.fecha_ingreso || '').replace(/(\.\d{3})\d+/, '$1'))
+    return fb - fa
+  })
+}
 
 /**
- * Prioridad más urgente primero; si empatan, mantiene criterio del backend (fecha más reciente primero).
+ * Acciones de detalle de nota por estado, rol y si el usuario es el responsable.
+ * @returns {{ habilitadas: string[], deshabilitadas: { accion: string, motivo: string }[] }}
  */
-export function comparePrioridadLuegoFechaIngresoDesc(a, b) {
-  const pa = ORDEN_PRIORIDAD_SORT[a.prioridad] ?? 4
-  const pb = ORDEN_PRIORIDAD_SORT[b.prioridad] ?? 4
-  if (pa !== pb) return pa - pb
-  return compareFechaIngresoDesc(a, b)
-}
-
-export function ordenarNotasPrioridadLuegoFecha(lista) {
-  return [...lista].sort(comparePrioridadLuegoFechaIngresoDesc)
-}
-
 export function accionesDisponibles(estado, rol, esResponsable) {
   const esSuperAdmin = ['SUPERVISOR', 'ADMINISTRADOR'].includes(rol)
 

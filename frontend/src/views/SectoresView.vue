@@ -5,6 +5,7 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import { get, post, patch } from '@/api/cliente'
+import { toArray } from '@/utils/notas'
 
 // Estado
 const sectores = ref([])
@@ -68,7 +69,7 @@ async function cargarSectores() {
   error.value = null
   try {
     const res = await get('/api/sectores/')
-    sectores.value = Array.isArray(res) ? res : res.results || []
+    sectores.value = toArray(res)
   } catch (e) {
     error.value = e?.data?.detalle || e?.data?.detail || e?.message || 'Error al cargar sectores.'
   } finally {

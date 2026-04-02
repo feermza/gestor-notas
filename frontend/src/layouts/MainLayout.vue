@@ -9,6 +9,7 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { get } from '@/api/cliente'
+import { toArray } from '@/utils/notas'
 import BadgeEstado from '@/components/BadgeEstado.vue'
 
 const router = useRouter()
@@ -51,7 +52,7 @@ function onBusqueda() {
       const res = await get(
         `/api/notas/?search=${encodeURIComponent(busquedaGlobal.value)}`,
       )
-      const lista = Array.isArray(res) ? res : res?.results || []
+      const lista = toArray(res)
       resultados.value = lista.slice(0, 5)
     } catch {
       resultados.value = []

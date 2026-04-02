@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.filters import SearchFilter
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -121,6 +122,9 @@ class NotaViewSet(viewsets.ModelViewSet):
             )
 
         return queryset.order_by("-fecha_ingreso")
+
+    filter_backends = [SearchFilter]
+    search_fields = ["numero_nota", "tema", "tarea_asignada", "remitente"]
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):

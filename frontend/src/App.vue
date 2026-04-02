@@ -81,8 +81,8 @@
 }
 .p-dialog-header-close:hover,
 .p-dialog-close-button:hover {
-  background-color: #f1f5f9 !important;
-  color: #1e3a5f !important;
+  background-color: #1e3a5f !important;
+  color: white !important;
 }
 .p-dialog-header-close .p-icon,
 .p-dialog-close-button .p-icon {

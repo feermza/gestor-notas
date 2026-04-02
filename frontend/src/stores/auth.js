@@ -48,7 +48,7 @@ export const useAuthStore = defineStore('auth', {
         const data = await get('/api/usuarios/yo/')
         this.usuario = data
         return data
-      } catch (err) {
+      } catch {
         // Si es 401 o cualquier error, establecer usuario = null
         // NO redirigir desde aquí - eso lo maneja el router guard
         this.usuario = null
