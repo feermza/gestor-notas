@@ -5,7 +5,7 @@
  */
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { get } from '@/api/cliente'
+import { reportesService } from '@/services/notasService'
 import { haceCuanto, formatoFechaHora, toArray } from '@/utils/notas'
 
 const router = useRouter()
@@ -20,6 +20,9 @@ const auditoria = ref([])
 const cargandoReportes = ref(true)
 const cargandoAuditoria = ref(false)
 const error = ref(null)
+
+/** ID de nota cuya(s) fila(s) de auditoría se resaltan al volver del detalle (scoped CSS vía v-bind). */
+const filaDestacadaId = ref(null)
 
 // Iconos por tipo de evento
 const iconoTipoEvento = (tipo) => {
@@ -54,8 +57,8 @@ async function cargarReportes() {
   error.value = null
   try {
     const [sectores, operadores] = await Promise.all([
-      get('/api/reportes/notas-por-sector/'),
-      get('/api/reportes/notas-por-operador/'),
+      reportesService.getReportesPorSector(),
+      reportesService.getReportesPorOperador(),
     ])
     notasPorSector.value = toArray(sectores)
     notasPorOperador.value = toArray(operadores)
@@ -70,7 +73,7 @@ async function cargarAuditoria() {
   cargandoAuditoria.value = true
   error.value = null
   try {
-    const res = await get('/api/auditoria/')
+    const res = await reportesService.getAuditoria()
     auditoria.value = toArray(res)
   } catch (e) {
     error.value = e?.data?.detalle || e?.data?.detail || e?.message || 'Error al cargar auditoría.'
@@ -87,10 +90,8 @@ function seleccionarTab(tab) {
 }
 
 function irANota(notaId) {
-  sessionStorage.setItem(
-    'admin-auditoria-scroll',
-    String(document.documentElement.scrollTop || 0),
-  )
+  sessionStorage.setItem('admin-auditoria-scroll', String(document.documentElement.scrollTop || 0))
+  sessionStorage.setItem('admin-auditoria-nota-id', String(notaId))
   router.push(`/notas/${notaId}`)
 }
 
@@ -103,6 +104,22 @@ onMounted(async () => {
     await nextTick()
     document.documentElement.scrollTop = parseInt(savedScroll, 10) || 0
     sessionStorage.removeItem('admin-auditoria-scroll')
+  }
+
+  const notaDestacadaId = sessionStorage.getItem('admin-auditoria-nota-id')
+  if (notaDestacadaId) {
+    tabActivo.value = 'auditoria'
+    await nextTick()
+    setTimeout(() => {
+      const idNum = Number.parseInt(notaDestacadaId, 10)
+      if (!Number.isNaN(idNum)) {
+        filaDestacadaId.value = idNum
+        setTimeout(() => {
+          filaDestacadaId.value = null
+        }, 3500)
+      }
+      sessionStorage.removeItem('admin-auditoria-nota-id')
+    }, 200)
   }
 })
 </script>
@@ -289,49 +306,62 @@ onMounted(async () => {
             <p class="text-sm text-gray-500 mt-1">Últimas 100 acciones registradas</p>
           </div>
           <div class="overflow-x-auto">
-            <DataTable
-              :value="auditoria"
-              data-key="id"
-              striped-rows
-              responsive-layout="stack"
-              breakpoint="960px"
-              class="p-datatable-sm admin-view"
-            >
-              <Column header="Fecha y hora">
-                <template #body="{ data }">
-                  <span v-tooltip.top="formatoFechaHora(data.fecha_hora)" class="cursor-help">
-                    {{ haceCuanto(data.fecha_hora) }}
-                  </span>
-                </template>
-              </Column>
-              <Column field="usuario" header="Usuario" />
-              <Column header="Nota">
-                <template #body="{ data: item }">
-                  <span
-                    v-if="item.nota_id"
-                    class="font-mono text-sm text-[#1e3a5f] hover:underline cursor-pointer font-bold"
-                    @click="irANota(item.nota_id)"
-                  >
-                    {{ item.nota }}
-                  </span>
-                  <span v-else class="text-gray-500">{{ item.nota || '—' }}</span>
-                </template>
-              </Column>
-              <Column header="Acción">
-                <template #body="{ data }">
-                  <div class="flex items-center gap-2">
-                    <i
-                      :class="['pi', iconoTipoEvento(data.tipo_evento).icon, 'text-sm']"
-                      :style="{ color: iconoTipoEvento(data.tipo_evento).color }"
-                    />
-                    <span class="text-gray-700">{{ data.descripcion_cambio || '—' }}</span>
-                  </div>
-                </template>
-              </Column>
-              <template #empty>
-                <div class="py-8 text-center text-gray-500">No hay registros de auditoría</div>
-              </template>
-            </DataTable>
+            <table class="w-full text-sm tabla-auditoria">
+              <thead>
+                <tr class="border-b border-gray-200 bg-gray-50">
+                  <th class="text-left py-2 px-3 font-medium text-gray-700">Fecha y hora</th>
+                  <th class="text-left py-2 px-3 font-medium text-gray-700">Usuario</th>
+                  <th class="text-left py-2 px-3 font-medium text-gray-700">Nota</th>
+                  <th class="text-left py-2 px-3 font-medium text-gray-700">Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="item in auditoria"
+                  :key="item.id"
+                  :data-nota-id="item.nota_id"
+                  :class="[
+                    'border-b border-gray-100',
+                    {
+                      'fila-destacada':
+                        filaDestacadaId !== null &&
+                        Number(item.nota_id) === Number(filaDestacadaId),
+                    },
+                  ]"
+                >
+                  <td class="py-3 px-3">
+                    <span v-tooltip.top="formatoFechaHora(item.fecha_hora)" class="cursor-help">
+                      {{ haceCuanto(item.fecha_hora) }}
+                    </span>
+                  </td>
+                  <td class="py-3 px-3 text-gray-800">{{ item.usuario }}</td>
+                  <td class="py-3 px-3">
+                    <span
+                      v-if="item.nota_id"
+                      class="font-mono text-sm text-[#1e3a5f] hover:underline cursor-pointer font-bold"
+                      @click="irANota(item.nota_id)"
+                    >
+                      {{ item.nota }}
+                    </span>
+                    <span v-else class="text-gray-500">{{ item.nota || '—' }}</span>
+                  </td>
+                  <td class="py-3 px-3">
+                    <div class="flex items-center gap-2">
+                      <i
+                        :class="['pi', iconoTipoEvento(item.tipo_evento).icon, 'text-sm']"
+                        :style="{ color: iconoTipoEvento(item.tipo_evento).color }"
+                      />
+                      <span class="text-gray-700">{{ item.descripcion_cambio || '—' }}</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="!auditoria.length">
+                  <td colspan="4" class="py-8 text-center text-gray-500">
+                    No hay registros de auditoría
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -351,5 +381,11 @@ onMounted(async () => {
 
 .tabla-reporte tbody tr:hover {
   background: #d2d7e4;
+}
+
+.fila-destacada {
+  background-color: #d2d7e4 !important;
+  border-left: 3px solid #1e3a5f !important;
+  transition: all6s ease;
 }
 </style>

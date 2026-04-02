@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { get, post, postFormData } from '@/api/cliente'
+import { notasService, sectoresService, usuariosService } from '@/services/notasService'
 import { useToast } from '@/composables/useToast'
 import { usePermisos } from '@/composables/usePermisos'
 import BtnVolver from '@/components/BtnVolver.vue'
@@ -149,7 +149,7 @@ async function cargarNota() {
   cargando.value = true
   error.value = null
   try {
-    nota.value = await get(`/api/notas/${notaId.value}/`)
+    nota.value = await notasService.getNota(notaId.value)
   } catch (e) {
     error.value = e.data?.detalle || e.data?.error || e.message || 'Error al cargar la nota.'
     nota.value = null
@@ -160,7 +160,7 @@ async function cargarNota() {
 
 async function cargarSectores() {
   try {
-    const res = await get('/api/sectores/?activos=true')
+    const res = await sectoresService.getSectores('?activos=true')
     sectores.value = toArray(res)
   } catch {
     sectores.value = []
@@ -169,7 +169,7 @@ async function cargarSectores() {
 
 async function cargarUsuarios() {
   try {
-    const res = await get('/api/usuarios/activos/')
+    const res = await usuariosService.getUsuariosActivos()
     usuarios.value = toArray(res)
   } catch {
     usuarios.value = []
@@ -187,7 +187,7 @@ async function subirAdjunto(event) {
     formData.append('nombre_archivo', archivo.name)
     formData.append('tipo_adjunto', 'DOCUMENTO_ORIGINAL')
 
-    await postFormData(`/api/notas/${nota.value.id}/adjuntos/`, formData)
+    await notasService.subirAdjunto(nota.value.id, formData)
 
     mostrarToastExito('Adjunto subido correctamente')
     await cargarNota()
@@ -205,7 +205,7 @@ async function subirAdjunto(event) {
 async function ejecutarCambioEstado(payload) {
   enviandoAccion.value = true
   try {
-    await post(`/api/notas/${notaId.value}/cambiar_estado/`, payload)
+    await notasService.cambiarEstado(notaId.value, payload)
     mostrarToastExito('Estado actualizado correctamente')
     await cargarNota()
     cerrarDialogs()
@@ -325,7 +325,7 @@ async function autoasignarse() {
   if (usuarioId.value == null) return
   enviandoAccion.value = true
   try {
-    await post(`/api/notas/${notaId.value}/cambiar_estado/`, {
+    await notasService.cambiarEstado(notaId.value, {
       estado_nuevo: 'ASIGNADA',
       responsable_nuevo: usuarioId.value,
     })

@@ -4,7 +4,8 @@
  * Listado, búsqueda, modal nuevo/editar, activar/desactivar.
  */
 import { ref, computed, onMounted } from 'vue'
-import { get, post, patch } from '@/api/cliente'
+import { post } from '@/api/cliente'
+import { usuariosService } from '@/services/notasService'
 import { toArray } from '@/utils/notas'
 import { useToast } from '@/composables/useToast'
 
@@ -81,7 +82,7 @@ async function cargarUsuarios() {
   cargando.value = true
   error.value = null
   try {
-    const res = await get('/api/usuarios/')
+    const res = await usuariosService.getUsuarios()
     usuarios.value = toArray(res)
   } catch (e) {
     error.value = e?.data?.detalle || e?.data?.detail || e?.message || 'Error al cargar usuarios.'
@@ -153,10 +154,10 @@ async function guardar() {
       payload.password = form.value.password.trim()
     }
     if (esNuevo.value) {
-      await post('/api/usuarios/', payload)
+      await usuariosService.crearUsuario(payload)
       mostrarToastExito('Usuario creado correctamente.')
     } else {
-      await patch(`/api/usuarios/${usuarioEditId.value}/`, payload)
+      await usuariosService.actualizarUsuario(usuarioEditId.value, payload)
       mostrarToastExito('Usuario actualizado correctamente.')
     }
     dialogVisible.value = false

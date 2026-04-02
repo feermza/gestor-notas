@@ -6,7 +6,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast as usePrimeToast } from 'primevue/usetoast'
 import { useToast } from '@/composables/useToast'
-import { get, post, postFormData } from '@/api/cliente'
+import { notasService, sectoresService, usuariosService } from '@/services/notasService'
 import { COLORES_PRIORIDAD, LABELS_PRIORIDAD, toArray } from '@/utils/notas'
 
 const props = defineProps({
@@ -160,7 +160,7 @@ function validar() {
 async function cargarSectores() {
   cargandoSectores.value = true
   try {
-    const res = await get('/api/sectores/?activos=true')
+    const res = await sectoresService.getSectores('?activos=true')
     sectores.value = toArray(res)
   } catch (_err) {
     sectores.value = []
@@ -172,7 +172,7 @@ async function cargarSectores() {
 async function cargarUsuarios() {
   cargandoUsuarios.value = true
   try {
-    const res = await get('/api/usuarios/activos/')
+    const res = await usuariosService.getUsuariosActivos()
     usuarios.value = toArray(res)
   } catch (_err) {
     usuarios.value = []
@@ -249,7 +249,7 @@ async function guardar() {
       payload.responsable_id = null
     }
 
-    const nota = await post('/api/notas/', payload)
+    const nota = await notasService.crearNota(payload)
     const notaId = nota.id
 
     for (const adj of adjuntos.value) {
@@ -258,7 +258,7 @@ async function guardar() {
       fd.append('tipo_adjunto', adj.tipo_adjunto)
       fd.append('nombre_archivo', adj.nombre_archivo)
       fd.append('archivo', adj.file)
-      await postFormData(`/api/notas/${notaId}/adjuntos/`, fd)
+      await notasService.subirAdjunto(notaId, fd)
     }
 
     mostrarToastExito(

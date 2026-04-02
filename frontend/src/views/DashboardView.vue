@@ -7,8 +7,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
-import { get } from '@/api/cliente'
 import { useAuthStore } from '@/stores/auth'
+import { notasService } from '@/services/notasService'
 import { usePermisos } from '@/composables/usePermisos'
 import TablaNotasSimple from '@/components/TablaNotasSimple.vue'
 import NuevaNotaModal from '@/components/NuevaNotaModal.vue'
@@ -80,13 +80,13 @@ const fechaActual = computed(() => {
 async function cargarDashboardSupervisor() {
   const [rIngresadas, rEnProceso, rAtrasadas, rEnEspera, rLista, rResueltas, rArchivadas] =
     await Promise.all([
-      get('/api/notas/?estado=INGRESADA'),
-      get('/api/notas/?estado=EN_PROCESO'),
-      get('/api/notas/atrasadas/'),
-      get('/api/notas/?estado=EN_ESPERA'),
-      get('/api/notas/'),
-      get('/api/notas/?estado=RESUELTA'),
-      get('/api/notas/?estado=ARCHIVADA'),
+      notasService.getNotas('?estado=INGRESADA'),
+      notasService.getNotas('?estado=EN_PROCESO'),
+      notasService.getAtrasadas(),
+      notasService.getNotas('?estado=EN_ESPERA'),
+      notasService.getNotas(),
+      notasService.getNotas('?estado=RESUELTA'),
+      notasService.getNotas('?estado=ARCHIVADA'),
     ])
 
   const listaIngresadas = toArray(rIngresadas)
@@ -106,10 +106,10 @@ async function cargarDashboardSupervisor() {
 
 async function cargarDashboardOperador() {
   const [rPendientes, rAsignadas, rEnProceso, rEnEspera] = await Promise.all([
-    get('/api/notas/pendientes/'),
-    get('/api/notas/?estado=ASIGNADA'),
-    get('/api/notas/?estado=EN_PROCESO'),
-    get('/api/notas/?estado=EN_ESPERA'),
+    notasService.getPendientes(),
+    notasService.getNotas('?estado=ASIGNADA'),
+    notasService.getNotas('?estado=EN_PROCESO'),
+    notasService.getNotas('?estado=EN_ESPERA'),
   ])
 
   const userId = auth.usuario?.id
@@ -133,7 +133,7 @@ async function cargarDashboard() {
       await cargarDashboardOperador()
     } else {
       // CONSULTOR u otro: dashboard mínimo (solo últimas ingresadas)
-      const rLista = await get('/api/notas/')
+      const rLista = await notasService.getNotas()
       ultimasIngresadas.value = toArray(rLista).slice(0, 5)
     }
   } catch (e) {

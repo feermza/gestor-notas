@@ -9,8 +9,8 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePermisos } from '@/composables/usePermisos'
-import { get } from '@/api/cliente'
 import { toArray } from '@/utils/notas'
+import { notasService } from '@/services/notasService'
 import BadgeEstado from '@/components/BadgeEstado.vue'
 
 const router = useRouter()
@@ -51,8 +51,8 @@ function onBusqueda() {
   mostrarResultados.value = true
   timeoutBusqueda = setTimeout(async () => {
     try {
-      const res = await get(
-        `/api/notas/?search=${encodeURIComponent(busquedaGlobal.value)}`,
+      const res = await notasService.getNotas(
+        `?search=${encodeURIComponent(busquedaGlobal.value)}`,
       )
       const lista = toArray(res)
       resultados.value = lista.slice(0, 5)

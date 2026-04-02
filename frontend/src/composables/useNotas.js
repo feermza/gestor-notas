@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { toArray } from '@/utils/notas'
-import { get } from '@/api/cliente'
+import { notasService } from '@/services/notasService'
 
 export function useNotas() {
   const notas = ref([])
@@ -11,7 +11,7 @@ export function useNotas() {
     cargando.value = true
     error.value = null
     try {
-      const res = await get(`/api/notas/${params}`)
+      const res = await notasService.getNotas(params)
       notas.value = toArray(res)
     } catch (e) {
       error.value =
@@ -25,7 +25,7 @@ export function useNotas() {
     cargando.value = true
     error.value = null
     try {
-      const res = await get('/api/notas/pendientes/')
+      const res = await notasService.getPendientes()
       notas.value = toArray(res)
     } catch (e) {
       error.value =

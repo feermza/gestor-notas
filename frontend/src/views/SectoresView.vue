@@ -4,7 +4,7 @@
  * Listado, búsqueda, modal nuevo/editar, activar/desactivar.
  */
 import { ref, computed, onMounted } from 'vue'
-import { get, post, patch } from '@/api/cliente'
+import { sectoresService } from '@/services/notasService'
 import { toArray } from '@/utils/notas'
 import { useToast } from '@/composables/useToast'
 
@@ -56,7 +56,7 @@ async function cargarSectores() {
   cargando.value = true
   error.value = null
   try {
-    const res = await get('/api/sectores/')
+    const res = await sectoresService.getSectores()
     sectores.value = toArray(res)
   } catch (e) {
     error.value = e?.data?.detalle || e?.data?.detail || e?.message || 'Error al cargar sectores.'
@@ -114,10 +114,10 @@ async function guardar() {
       activo: form.value.activo,
     }
     if (esNuevo.value) {
-      await post('/api/sectores/', payload)
+      await sectoresService.crearSector(payload)
       mostrarToastExito('Sector creado correctamente.')
     } else {
-      await patch(`/api/sectores/${sectorEditId.value}/`, payload)
+      await sectoresService.actualizarSector(sectorEditId.value, payload)
       mostrarToastExito('Sector actualizado correctamente.')
     }
     dialogVisible.value = false
@@ -138,7 +138,7 @@ async function guardar() {
 async function toggleActivo(sector) {
   try {
     const nuevoActivo = !(sector.activo ?? true)
-    await patch(`/api/sectores/${sector.id}/`, { activo: nuevoActivo })
+    await sectoresService.actualizarSector(sector.id, { activo: nuevoActivo })
     mostrarToastExito(nuevoActivo ? 'Sector activado.' : 'Sector desactivado.')
     await cargarSectores()
   } catch (e) {
