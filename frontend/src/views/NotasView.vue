@@ -8,23 +8,34 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
-import { get } from '@/api/cliente'
 import { usePermisos } from '@/composables/usePermisos'
+import { useNotas } from '@/composables/useNotas'
+import { useFiltrosNotas } from '@/composables/useFiltrosNotas'
 import TablaNotas from '@/components/TablaNotas.vue'
 import BtnVolver from '@/components/BtnVolver.vue'
 import NuevaNotaModal from '@/components/NuevaNotaModal.vue'
-import { LABELS_ESTADO, LABELS_PRIORIDAD, compareFechaIngresoDesc, toArray } from '@/utils/notas'
+import { LABELS_ESTADO, LABELS_PRIORIDAD, compareFechaIngresoDesc } from '@/utils/notas'
 
 const route = useRoute()
 const toast = useToast()
 const { puedeCrearNota } = usePermisos()
 
+const { notas, cargando, error, cargarNotas } = useNotas()
+const {
+  textoBusqueda,
+  filtroEstado,
+  filtroPrioridad,
+  soloAtrasadas,
+  sinAsignar,
+  filtroEstadoBloqueado,
+  aplicarQueryParams,
+  limpiarFiltros,
+} = useFiltrosNotas()
+
+cargando.value = true
+
 const mostrarModalNota = ref(false)
 const nuevaNotaModalRef = ref(null)
-
-const filtroEstadoBloqueado = computed(
-  () => !!(route.query.estado || route.query.sin_asignar || route.query.atrasadas),
-)
 
 function mostrarToastExito(mensaje) {
   toast.add({
@@ -40,18 +51,6 @@ async function onNotaGuardada() {
   mostrarToastExito('Nota creada correctamente')
   await cargarNotas()
 }
-
-// Estado de carga y error
-const cargando = ref(true)
-const error = ref(null)
-const notas = ref([])
-
-// Filtros (aplicados en frontend)
-const textoBusqueda = ref('')
-const filtroEstado = ref(null)
-const filtroPrioridad = ref(null)
-const soloAtrasadas = ref(false)
-const sinAsignar = ref(false)
 
 const paginaActual = ref(1)
 const porPagina = ref(10)
@@ -121,50 +120,7 @@ const tituloVista = computed(() => {
   return `Notas (${n})`
 })
 
-function limpiarFiltros() {
-  textoBusqueda.value = ''
-  if (!filtroEstadoBloqueado.value) {
-    filtroEstado.value = null
-  }
-  filtroPrioridad.value = null
-  soloAtrasadas.value = false
-  sinAsignar.value = false
-}
-
-async function cargarNotas() {
-  cargando.value = true
-  error.value = null
-  try {
-    const res = await get('/api/notas/')
-    notas.value = toArray(res)
-  } catch (e) {
-    error.value = e.data?.detalle || e.data?.error || e.message || 'Error al cargar las notas.'
-  } finally {
-    cargando.value = false
-  }
-}
-
-// Aplicar query params a los filtros (para navegación programática)
-function aplicarQueryParams() {
-  const q = route.query
-  // Resetear siempre primero (null para que el Dropdown muestre placeholder cuando no hay valor)
-  filtroEstado.value = null
-  filtroPrioridad.value = null
-  soloAtrasadas.value = false
-  sinAsignar.value = false
-  textoBusqueda.value = ''
-  // Luego activar los que correspondan (value = string igual a option-value, ej. 'EN_PROCESO')
-  if (q.estado) filtroEstado.value = q.estado
-  if (q.prioridad) filtroPrioridad.value = q.prioridad
-  if (q.atrasadas === 'true') soloAtrasadas.value = true
-  if (q.sin_asignar === 'true') sinAsignar.value = true
-  if (q.search) textoBusqueda.value = q.search
-}
-
 onMounted(() => {
-  // Preactivar buscador si se llegó con ?search= (p. ej. desde búsqueda global del navbar)
-  const searchQuery = route.query.search
-  if (searchQuery) textoBusqueda.value = searchQuery
   aplicarQueryParams()
   cargarNotas()
 })

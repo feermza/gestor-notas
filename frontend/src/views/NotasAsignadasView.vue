@@ -6,16 +6,16 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { get } from '@/api/cliente'
-import { toArray, ordenarPorPrioridadYFecha } from '@/utils/notas'
+import { useNotas } from '@/composables/useNotas'
+import { ordenarPorPrioridadYFecha } from '@/utils/notas'
 import TablaNotasSimple from '@/components/TablaNotasSimple.vue'
 import BtnVolver from '@/components/BtnVolver.vue'
 
 const route = useRoute()
 
-const cargando = ref(true)
-const error = ref(null)
-const notas = ref([])
+const { notas, cargando, error, cargarPendientes } = useNotas()
+cargando.value = true
+
 const tabActivo = ref('todas')
 const textoBusqueda = ref('')
 
@@ -42,20 +42,6 @@ const notasFiltradas = computed(() => {
 const notasOrdenadas = computed(() => ordenarPorPrioridadYFecha(notasFiltradas.value))
 
 const totalNotas = computed(() => notasFiltradas.value.length)
-
-async function cargarPendientes() {
-  cargando.value = true
-  error.value = null
-  try {
-    const res = await get('/api/notas/pendientes/')
-    notas.value = toArray(res)
-  } catch (e) {
-    error.value = e.data?.detalle || e.data?.error || e.message || 'Error al cargar las notas.'
-    notas.value = []
-  } finally {
-    cargando.value = false
-  }
-}
 
 onMounted(() => {
   const estadoQuery = route.query.estado
