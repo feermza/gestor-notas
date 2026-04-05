@@ -39,6 +39,13 @@ class Agente(models.Model):
         unique=True,
         verbose_name='Número de legajo'
     )
+    dni = models.CharField(
+        max_length=15,
+        blank=True,
+        null=True,
+        verbose_name='DNI',
+        help_text='Documento Nacional de Identidad (legajo virtual / RRHH)',
+    )
     sector = models.ForeignKey(
         Sector,
         on_delete=models.SET_NULL,
@@ -66,6 +73,10 @@ class Agente(models.Model):
 
     def __str__(self):
         return f"{self.apellido}, {self.nombre} (Leg. {self.legajo_numero})"
+
+    @property
+    def nombre_completo(self):
+        return f"{self.apellido}, {self.nombre}"
 
 
 # --- Choices ---

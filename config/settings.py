@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     # Apps del proyecto
     'usuarios.apps.UsuariosConfig',
     'notas.apps.NotasConfig',
+    'agentes.apps.AgentesConfig',
     'reportes.apps.ReportesConfig',
 ]
 

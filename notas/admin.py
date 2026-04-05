@@ -24,9 +24,9 @@ class SectorAdmin(admin.ModelAdmin):
 @admin.register(Agente)
 class AgenteAdmin(admin.ModelAdmin):
     """Administración del modelo Agente."""
-    list_display = ['legajo_numero', 'apellido', 'nombre', 'sector', 'cargo', 'activo', 'usuario']
+    list_display = ['legajo_numero', 'apellido', 'nombre', 'dni', 'sector', 'cargo', 'activo', 'usuario']
     list_filter = ['activo', 'sector']
-    search_fields = ['apellido', 'nombre', 'legajo_numero', 'cargo']
+    search_fields = ['apellido', 'nombre', 'legajo_numero', 'dni', 'cargo']
     list_editable = ['activo']
     autocomplete_fields = ['sector', 'usuario']
     ordering = ['apellido', 'nombre']

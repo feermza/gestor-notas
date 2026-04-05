@@ -105,7 +105,8 @@ async function enviar() {
   background-color: #1a2f4a;
   background-image:
     linear-gradient(135deg, rgba(15, 30, 50, 0.65) 0%, rgba(15, 30, 50, 0.65) 100%),
-    url('/images/institucional.jpg'), linear-gradient(135deg, #1a2f4a 0%, #2d5986 50%, #1a2f4a 100%);
+    url('/images/institucional2.png'),
+    linear-gradient(135deg, #1a2f4a 0%, #2d5986 50%, #1a2f4a 100%);
   background-size: cover;
   background-position: center;
 }
