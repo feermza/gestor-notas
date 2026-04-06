@@ -4,7 +4,7 @@ from django.conf import settings
 from django.utils import timezone
 
 
-# --- Sectores y agentes ---
+# --- Sectores ---
 
 class Sector(models.Model):
     """Sector o área institucional (ej: RRHH=150, Secretaría Académica=129)."""
@@ -25,58 +25,6 @@ class Sector(models.Model):
 
     def __str__(self):
         return f"{self.nombre} ({self.numero})"
-
-
-class Agente(models.Model):
-    """
-    Persona de la institución (puede o no tener acceso al sistema).
-    Agente != Usuario: un agente puede no tener login.
-    """
-    apellido = models.CharField(max_length=100, verbose_name='Apellido')
-    nombre = models.CharField(max_length=100, verbose_name='Nombre')
-    legajo_numero = models.CharField(
-        max_length=20,
-        unique=True,
-        verbose_name='Número de legajo'
-    )
-    dni = models.CharField(
-        max_length=15,
-        blank=True,
-        null=True,
-        verbose_name='DNI',
-        help_text='Documento Nacional de Identidad (legajo virtual / RRHH)',
-    )
-    sector = models.ForeignKey(
-        Sector,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='agentes',
-        verbose_name='Sector'
-    )
-    cargo = models.CharField(max_length=150, blank=True, verbose_name='Cargo')
-    activo = models.BooleanField(default=True, verbose_name='Activo')
-    usuario = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='agente',
-        verbose_name='Usuario',
-        help_text='Usuario del sistema asociado (si tiene acceso)'
-    )
-
-    class Meta:
-        verbose_name = 'Agente'
-        verbose_name_plural = 'Agentes'
-        ordering = ['apellido', 'nombre']
-
-    def __str__(self):
-        return f"{self.apellido}, {self.nombre} (Leg. {self.legajo_numero})"
-
-    @property
-    def nombre_completo(self):
-        return f"{self.apellido}, {self.nombre}"
 
 
 # --- Choices ---
@@ -273,12 +221,12 @@ class Nota(models.Model):
         verbose_name='Fecha de Resolución'
     )
     agentes = models.ManyToManyField(
-        Agente,
+        settings.AUTH_USER_MODEL,
         through='NotaAgente',
         related_name='notas',
         blank=True,
         verbose_name='Agentes',
-        help_text='Agentes asociados a esta nota'
+        help_text='Agentes (personas institucionales) asociados a esta nota',
     )
 
     class Meta:
@@ -367,7 +315,7 @@ class Nota(models.Model):
 
 
 class NotaAgente(models.Model):
-    """Tabla intermedia entre Nota y Agente (ManyToMany con observación)."""
+    """Tabla intermedia entre Nota y agente (AUTH_USER_MODEL)."""
     nota = models.ForeignKey(
         Nota,
         on_delete=models.CASCADE,
@@ -375,7 +323,7 @@ class NotaAgente(models.Model):
         verbose_name='Nota'
     )
     agente = models.ForeignKey(
-        Agente,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='nota_agente_set',
         verbose_name='Agente'
@@ -571,7 +519,7 @@ class LegajoDocumento(models.Model):
     Estructura de carpetas: /legajos/{legajo_numero}/{año}/
     """
     agente = models.ForeignKey(
-        Agente,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='documentos_legajo',
         verbose_name='Agente'

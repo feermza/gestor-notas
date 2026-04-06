@@ -63,8 +63,9 @@ class NotaCreateSerializer(serializers.Serializer):
     email_respuesta = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
 
     def create(self, validated_data):
-        from usuarios.models import Usuario
+        from django.contrib.auth import get_user_model
 
+        User = get_user_model()
         sector_origen_id = validated_data['sector_origen_id']
         responsable_id = validated_data.get('responsable_id')
         numero_externo = (validated_data.get('numero_nota_externo') or '').strip()
@@ -73,7 +74,7 @@ class NotaCreateSerializer(serializers.Serializer):
 
         # Si viene responsable_id: asignar responsable y estado ASIGNADA; si no, INGRESADA sin responsable.
         if responsable_id is not None:
-            responsable = Usuario.objects.get(id=responsable_id)
+            responsable = User.objects.get(id=responsable_id)
             estado_inicial = EstadoChoices.ASIGNADA
         else:
             responsable = None

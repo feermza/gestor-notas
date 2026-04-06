@@ -2,7 +2,6 @@ from django.contrib import admin
 from django.utils.html import format_html
 from .models import (
     Sector,
-    Agente,
     Nota,
     NotaAgente,
     HistorialNota,
@@ -19,17 +18,6 @@ class SectorAdmin(admin.ModelAdmin):
     list_filter = ['activo']
     search_fields = ['nombre', 'descripcion']
     ordering = ['numero']
-
-
-@admin.register(Agente)
-class AgenteAdmin(admin.ModelAdmin):
-    """Administración del modelo Agente."""
-    list_display = ['legajo_numero', 'apellido', 'nombre', 'dni', 'sector', 'cargo', 'activo', 'usuario']
-    list_filter = ['activo', 'sector']
-    search_fields = ['apellido', 'nombre', 'legajo_numero', 'dni', 'cargo']
-    list_editable = ['activo']
-    autocomplete_fields = ['sector', 'usuario']
-    ordering = ['apellido', 'nombre']
 
 
 class NotaAgenteInline(admin.TabularInline):
@@ -263,7 +251,7 @@ class LegajoDocumentoAdmin(admin.ModelAdmin):
     """Administración del modelo LegajoDocumento."""
     list_display = ['agente', 'nota', 'nombre_archivo', 'tipo_documento', 'fecha_carga', 'cargado_por']
     list_filter = ['tipo_documento', 'fecha_carga']
-    search_fields = ['agente__apellido', 'agente__nombre', 'agente__legajo_numero', 'nombre_archivo']
+    search_fields = ['agente__apellido', 'agente__nombres', 'agente__legajo', 'nombre_archivo']
     autocomplete_fields = ['agente', 'nota', 'cargado_por']
     readonly_fields = ['fecha_carga']
     ordering = ['-fecha_carga']

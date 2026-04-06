@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 
 
-from usuarios.permissions import (
+from agentes.permissions import (
     EstaAutenticado,
     EsDirectorJefeOAdmin,
     IsAdministrador,
@@ -204,9 +204,11 @@ class NotaViewSet(viewsets.ModelViewSet):
                 responsable_anterior.id if responsable_anterior else None
             )
             if int(responsable_nuevo_id) != responsable_id_anterior:
-                from usuarios.models import Usuario
+                from django.contrib.auth import get_user_model
 
-                responsable_nuevo = get_object_or_404(Usuario, id=responsable_nuevo_id)
+                responsable_nuevo = get_object_or_404(
+                    get_user_model(), id=responsable_nuevo_id
+                )
                 campos_modificados["responsable"] = {
                     "anterior": (
                         str(responsable_anterior) if responsable_anterior else None
@@ -313,9 +315,11 @@ class NotaViewSet(viewsets.ModelViewSet):
         # Actualizar responsable si corresponde (ASIGNADA requiere responsable_nuevo)
         responsable_nuevo = None
         if responsable_nuevo_id:
-            from usuarios.models import Usuario
+            from django.contrib.auth import get_user_model
 
-            responsable_nuevo = get_object_or_404(Usuario, id=responsable_nuevo_id)
+            responsable_nuevo = get_object_or_404(
+                get_user_model(), id=responsable_nuevo_id
+            )
             nota.responsable = responsable_nuevo
 
         nota.save()
@@ -578,9 +582,10 @@ def reporte_notas_por_operador(request):
     GET /api/reportes/notas-por-operador/
     Devuelve lista de operadores con conteo de notas asignadas.
     """
-    from usuarios.models import Usuario
+    from django.contrib.auth import get_user_model
 
-    operadores = Usuario.objects.filter(
+    User = get_user_model()
+    operadores = User.objects.filter(
         rol__in=["OPERADOR", "SUPERVISOR"],
         is_active=True,
     ).order_by("apellido", "nombres")

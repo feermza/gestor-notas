@@ -48,10 +48,9 @@ INSTALLED_APPS = [
     'corsheaders',
     # Django REST Framework
     'rest_framework',
-    # Apps del proyecto
-    'usuarios.apps.UsuariosConfig',
-    'notas.apps.NotasConfig',
+    # Apps del proyecto (agentes define AUTH_USER_MODEL antes que notas)
     'agentes.apps.AgentesConfig',
+    'notas.apps.NotasConfig',
     'reportes.apps.ReportesConfig',
 ]
 
@@ -63,6 +62,7 @@ MIDDLEWARE = [
     'config.middleware.CSRFExemptAPIMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'agentes.middleware.DebeCambiarPasswordMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -145,11 +145,11 @@ MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Modelo de usuario personalizado
-AUTH_USER_MODEL = 'usuarios.Usuario'
+AUTH_USER_MODEL = 'agentes.Agente'
 
 # Backends de autenticación (permite login con legajo)
 AUTHENTICATION_BACKENDS = [
-    'usuarios.backends.LegajoBackend',
+    'agentes.backends.LegajoBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
